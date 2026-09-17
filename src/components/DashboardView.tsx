@@ -108,7 +108,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {summary.playersSold}
             </span>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Icons & Auctioned
+              Auctioned to teams
             </p>
           </div>
         </div>
@@ -209,9 +209,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <thead className="bg-slate-50 text-slate-500 font-['Outfit'] uppercase tracking-wider text-[11px] border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-4 font-bold">TEAM</th>
-                <th className="py-3.5 px-3 font-bold text-center">ICONS</th>
-                <th className="py-3.5 px-3 font-bold text-center">AUCTION PLAYERS</th>
-                <th className="py-3.5 px-3 font-bold text-center">TOTAL PLAYERS</th>
+                <th className="py-3.5 px-3 font-bold text-center">SQUAD PLAYERS</th>
+                <th className="py-3.5 px-3 font-bold text-center">SLOTS LEFT</th>
                 <th className="py-3.5 px-3 font-bold text-right">POINTS SPENT</th>
                 <th className="py-3.5 px-3 font-bold text-right">POINTS REMAINING</th>
                 <th className="py-3.5 px-3 font-bold text-right">MAX SAFE BID</th>
@@ -260,31 +259,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </td>
 
-                    {/* Icons */}
-                    <td className="py-3 px-3 text-center">
-                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold border border-amber-200">
-                        {team.iconPlayersCount} / {settings.iconPlayersPerTeam}
-                      </span>
-                    </td>
-
-                    {/* Auction Players */}
-                    <td className="py-3 px-3 text-center">
-                      <span
-                        className={`font-semibold ${
-                          team.auctionPlayersCount === settings.auctionPlayersPerTeam
-                            ? 'text-emerald-600 font-bold'
-                            : team.auctionPlayersCount > settings.auctionPlayersPerTeam
-                            ? 'text-rose-600 font-bold'
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        {team.auctionPlayersCount} / {settings.auctionPlayersPerTeam}
-                      </span>
-                    </td>
-
                     {/* Total Players */}
                     <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
                       {team.totalPlayers} / {settings.maxSquadSize}
+                    </td>
+
+                    {/* Slots Left */}
+                    <td className="py-3 px-3 text-center font-mono text-slate-600">
+                      {Math.max(0, settings.maxSquadSize - team.totalPlayers)}
                     </td>
 
                     {/* Points Spent */}
@@ -351,7 +333,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Squad Structure ({settings.maxSquadSize} Players)
             </span>
             <p className="text-slate-500">
-              Each team allocates up to {settings.iconPlayersPerTeam} Icon Players and {settings.auctionPlayersPerTeam} Auction Players under live hammer bidding.
+              Each team can acquire up to {settings.maxSquadSize} players under open live hammer bidding with equal opportunities for all players.
             </p>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">

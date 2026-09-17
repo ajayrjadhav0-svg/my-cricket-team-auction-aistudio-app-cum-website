@@ -90,10 +90,9 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
             <thead className="bg-slate-50 text-slate-500 font-['Outfit'] uppercase tracking-wider text-[11px] border-b border-slate-200">
               <tr>
                 <th className="py-2.5 px-3 font-bold">SLOT #</th>
-                <th className="py-2.5 px-3 font-bold">TYPE</th>
                 <th className="py-2.5 px-3 font-bold">PLAYER</th>
                 <th className="py-2.5 px-2 font-bold">ROLE</th>
-                <th className="py-2.5 px-3 font-bold">ZONE</th>
+                <th className="py-2.5 px-3 font-bold">VILLAGE</th>
                 <th className="py-2.5 px-3 font-bold text-right">POINTS</th>
                 {onReopenPlayer && <th className="py-2.5 px-2 text-center font-bold">ACTION</th>}
               </tr>
@@ -108,17 +107,6 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
                   return (
                     <tr key={player.id} className="hover:bg-slate-50">
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-500">#{slot}</td>
-                      <td className="py-2.5 px-3">
-                        <span
-                          className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
-                            player.isIcon
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}
-                        >
-                          {player.isIcon ? 'ICON' : 'AUCTION'}
-                        </span>
-                      </td>
                       <td className="py-2.5 px-3 font-['Outfit'] font-bold text-slate-900">
                         {player.code} - {player.name}
                       </td>
@@ -135,15 +123,13 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
                       </td>
                       {onReopenPlayer && (
                         <td className="py-2.5 px-2 text-center">
-                          {!player.isIcon && (
-                            <button
-                              onClick={() => onReopenPlayer(player.id)}
-                              title="Rollback player sale back to Available"
-                              className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => onReopenPlayer(player.id)}
+                            title="Rollback player sale back to Available"
+                            className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       )}
                     </tr>
@@ -154,11 +140,6 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
                 return (
                   <tr key={`empty-${idx}`} className="bg-slate-50/40 text-slate-400">
                     <td className="py-2.5 px-3 font-mono font-semibold">#{slot}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded border border-dashed border-slate-300">
-                        EMPTY
-                      </span>
-                    </td>
                     <td className="py-2.5 px-3 italic text-slate-400">Unfilled Squad Slot</td>
                     <td className="py-2.5 px-2">—</td>
                     <td className="py-2.5 px-3">—</td>

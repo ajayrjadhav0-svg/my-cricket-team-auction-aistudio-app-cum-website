@@ -8,6 +8,7 @@ import {
   Clock,
   Filter,
   ArrowUpDown,
+  Share2,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { AuctionTransaction } from '../types';
@@ -16,6 +17,7 @@ import {
   formatPoints,
   getRoleBadgeStyle,
 } from '../utils/formatters';
+import { AuctionExportModal } from './AuctionExportModal';
 
 export const AuctionHistoryView: React.FC = () => {
   const { state, role, reopenPlayer } = useAuction();
@@ -25,6 +27,7 @@ export const AuctionHistoryView: React.FC = () => {
   const [villageFilter, setVillageFilter] = useState('ALL');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [rollbackPlayerId, setRollbackPlayerId] = useState<number | null>(null);
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   if (!state) {
     return <div className="p-8 text-slate-400">Loading auction history log...</div>;
@@ -71,6 +74,11 @@ export const AuctionHistoryView: React.FC = () => {
 
   return (
     <div className="space-y-5 pb-12 max-w-7xl mx-auto">
+      <AuctionExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+      />
+
       {/* Header & Export */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
         <div>
@@ -79,18 +87,28 @@ export const AuctionHistoryView: React.FC = () => {
             <span>AUCTION TRANSACTION AUDIT LOG</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time chronological hammer ledger. Records price, franchise, zone, and extra cash fees.
+            Real-time chronological hammer ledger. Records price, franchise, village, and extra cash fees.
           </p>
         </div>
 
-        <a
-          href="/api/export/csv?type=history"
-          download="auction_ledger.csv"
-          className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all self-start sm:self-auto"
-        >
-          <Download className="w-4 h-4 text-indigo-400" />
-          <span>EXPORT CSV / EXCEL</span>
-        </a>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsExportOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            <Share2 className="w-4 h-4 text-indigo-600" />
+            <span>Print / PDF / Excel</span>
+          </button>
+
+          <a
+            href="/api/export/csv?type=history"
+            download="auction_ledger.csv"
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all self-start sm:self-auto"
+          >
+            <Download className="w-4 h-4 text-indigo-400" />
+            <span>EXPORT CSV</span>
+          </a>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
@@ -102,7 +120,7 @@ export const AuctionHistoryView: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by player, team, or zone..."
+            placeholder="Search by player, team, or village..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
           />
         </div>
@@ -130,7 +148,7 @@ export const AuctionHistoryView: React.FC = () => {
             onChange={(e) => setVillageFilter(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
           >
-            <option value="ALL">All Zones ({uniqueVillages.length})</option>
+            <option value="ALL">All Villages ({uniqueVillages.length})</option>
             {uniqueVillages.map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -162,11 +180,10 @@ export const AuctionHistoryView: React.FC = () => {
                 <th className="py-3 px-4 font-bold">TIME</th>
                 <th className="py-3 px-4 font-bold">PLAYER</th>
                 <th className="py-3 px-3 font-bold">ROLE</th>
-                <th className="py-3 px-3 font-bold">ZONE</th>
+                <th className="py-3 px-3 font-bold">VILLAGE</th>
                 <th className="py-3 px-4 font-bold">WINNING TEAM</th>
                 <th className="py-3 px-3 font-bold text-right">HAMMER PRICE</th>
                 <th className="py-3 px-3 font-bold text-right">PENALTY ₹</th>
-                <th className="py-3 px-4 font-bold text-center">TYPE</th>
                 {role === 'admin' && (
                   <th className="py-3 px-4 font-bold text-center">ACTIONS</th>
                 )}
@@ -175,14 +192,13 @@ export const AuctionHistoryView: React.FC = () => {
             <tbody className="divide-y divide-slate-100 font-medium">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={role === 'admin' ? 9 : 8} className="text-center py-12 text-slate-400">
+                  <td colSpan={role === 'admin' ? 8 : 7} className="text-center py-12 text-slate-400">
                     No auction transactions logged yet.
                   </td>
                 </tr>
               ) : (
                 filteredTransactions.map((tx) => {
                   const roleStyle = getRoleBadgeStyle(tx.role);
-                  const isIcon = tx.isIcon;
                   const dateStr = new Date(tx.timestamp).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -214,42 +230,28 @@ export const AuctionHistoryView: React.FC = () => {
                       </td>
 
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                        {formatPoints(tx.points)} pts
+                        {formatPoints((tx as any).points ?? tx.soldPrice)} pts
                       </td>
 
                       <td className="py-3 px-3 text-right font-mono">
-                        {tx.committeeCash > 0 ? (
+                        {(tx as any).committeeCash > 0 || (tx as any).committeeCharge > 0 ? (
                           <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                            {formatINR(tx.committeeCash)}
+                            {formatINR((tx as any).committeeCash || (tx as any).committeeCharge)}
                           </span>
                         ) : (
                           <span className="text-slate-400">₹0</span>
                         )}
                       </td>
 
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-wider ${
-                            isIcon
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}
-                        >
-                          {isIcon ? 'ICON' : 'AUCTION'}
-                        </span>
-                      </td>
-
                       {role === 'admin' && (
                         <td className="py-3 px-4 text-center">
-                          {!isIcon && (
-                            <button
-                              onClick={() => setRollbackPlayerId(tx.playerId)}
-                              title="Rollback transaction and reopen player"
-                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setRollbackPlayerId(tx.playerId)}
+                            title="Rollback transaction and reopen player"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       )}
                     </tr>

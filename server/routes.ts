@@ -231,34 +231,52 @@ apiRouter.post('/import', (req: Request, res: Response) => {
   res.json({ message: `Imported ${result.count} players`, state: db.getState() });
 });
 
-// Export CSV
+// Export CSV & Data
 apiRouter.get('/export/csv', (req: Request, res: Response) => {
   const { type } = req.query;
   const state = db.getState();
 
   if (type === 'history') {
-    const headers = 'Time,Auction Order,Player ID,Player Name,Zone/Village,Role,Team,Sold Price,Committee Charge,Type\n';
+    const headers = 'Time,Auction Order,Player ID,Player Name,Village,Role,Purchased By Team,Sold Price (Points),Penalty Charge (INR)\n';
     const rows = state.transactions
       .map(
         t =>
-          `"${t.timestamp}",${t.auctionOrder},"P${t.playerId.toString().padStart(3, '0')}","${t.playerName}","${t.village}","${t.role}","${t.teamName}",${t.soldPrice},${t.committeeCharge},"${t.isIcon ? 'ICON' : 'AUCTION'}"`
+          `"${t.timestamp}",${t.auctionOrder},"P${t.playerId.toString().padStart(3, '0')}","${t.playerName}","${t.village}","${t.role}","${t.teamName}",${t.soldPrice},${t.committeeCharge}`
       )
       .join('\n');
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="cricket_auction_history.csv"');
     return res.send(headers + rows);
   }
 
-  // Default export: All players with squad allocation
-  const headers = 'Player ID,Code,Player Name,Zone/Village,Role,Status,Sold To Team,Sold Price (Points),Is Icon\n';
+  if (type === 'squads') {
+    const headers = 'Team Name,Short Code,Squad Count,Points Spent,Points Remaining,Player Name,Village,Role,Sold Price (Points)\n';
+    const lines: string[] = [];
+    state.teams.forEach(team => {
+      const squad = state.players.filter(p => p.soldToTeamId === team.id);
+      if (squad.length === 0) {
+        lines.push(`"${team.name}","${team.shortCode}",0,0,${team.pointsRemaining},"NO PLAYERS YET","","",""`);
+      } else {
+        squad.forEach(p => {
+          lines.push(`"${team.name}","${team.shortCode}",${squad.length},${team.totalPointsSpent},${team.pointsRemaining},"${p.name}","${p.village}","${p.role}",${p.soldPrice}`);
+        });
+      }
+    });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="cricket_team_squads.csv"');
+    return res.send(headers + lines.join('\n'));
+  }
+
+  // Default export: All players with allocation
+  const headers = 'Player ID,Code,Player Name,Village,Role,Status,Team,Sold Price (Points)\n';
   const rows = state.players
     .map(p => {
-      const team = p.soldToTeamId ? state.teams.find(t => t.id === p.soldToTeamId)?.name : 'AVAILABLE';
-      return `${p.id},"${p.code}","${p.name}","${p.village}","${p.role}","${p.status}","${team}",${p.soldPrice},"${p.isIcon ? 'YES' : 'NO'}"`;
+      const team = p.soldToTeamId ? state.teams.find(t => t.id === p.soldToTeamId)?.name : 'UNSOLD/AVAILABLE';
+      return `${p.id},"${p.code}","${p.name}","${p.village}","${p.role}","${p.status}","${team}",${p.soldPrice}`;
     })
     .join('\n');
 
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="my_cricket_league_players.csv"');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="cricket_auction_players.csv"');
   res.send(headers + rows);
 });

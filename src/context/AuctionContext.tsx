@@ -42,6 +42,8 @@ interface AuctionContextType {
   importPlayers: (players: any[]) => Promise<number>;
   importCSV: (csvText: string, replaceExisting?: boolean) => Promise<{ count: number; message: string } | null>;
   getViewerShareUrl: () => string;
+  loginAdmin: (passcode: string) => boolean;
+  logoutAdmin: () => void;
 }
 
 const AuctionContext = createContext<AuctionContextType | undefined>(undefined);
@@ -92,6 +94,39 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch {
       return window.location.href;
     }
+  };
+
+  const loginAdmin = (passcode: string): boolean => {
+    const clean = (passcode || '').trim().toLowerCase();
+    // Valid passcodes for auction organizers
+    if (['admin123', 'rbpl2026', 'auction2026', 'admin', 'director2026'].includes(clean)) {
+      setRoleState('admin');
+      try {
+        localStorage.setItem('cricket_auction_role', 'admin');
+        const url = new URL(window.location.href);
+        url.searchParams.set('role', 'admin');
+        window.history.replaceState({}, '', url.toString());
+      } catch {
+        // Ignore
+      }
+      showNotification('success', 'Admin access granted. Admin Panel is now unlocked.');
+      return true;
+    }
+    showNotification('error', 'Incorrect administrator passcode.');
+    return false;
+  };
+
+  const logoutAdmin = () => {
+    setRoleState('viewer');
+    try {
+      localStorage.setItem('cricket_auction_role', 'viewer');
+      const url = new URL(window.location.href);
+      url.searchParams.set('role', 'viewer');
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // Ignore
+    }
+    showNotification('warning', 'Switched to Spectator Mode. Admin Panel is now hidden.');
   };
 
   const clearNotification = () => setNotification(null);
@@ -455,6 +490,8 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         importPlayers,
         importCSV,
         getViewerShareUrl,
+        loginAdmin,
+        logoutAdmin,
       }}
     >
       {children}

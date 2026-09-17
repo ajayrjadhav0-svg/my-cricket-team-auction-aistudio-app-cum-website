@@ -35,6 +35,7 @@ import { EditTeamModal } from './admin/EditTeamModal';
 import { TeamSquadModal } from './admin/TeamSquadModal';
 import { AddNewPlayerModal } from './admin/AddNewPlayerModal';
 import { CsvUploadModal } from './admin/CsvUploadModal';
+import { AdminAccessGate } from './admin/AdminAccessGate';
 
 interface AdminPanelProps {
   onSelectNav: (nav: ActiveNav) => void;
@@ -279,6 +280,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
     });
     showNotification('success', `Squad size limit set to ${newSize} players per team.`);
   };
+
+  // Guard: Admin panel is strictly for authenticated administrators only
+  if (role !== 'admin') {
+    return (
+      <AdminAccessGate
+        onReturnToDashboard={() => onSelectNav('dashboard')}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">

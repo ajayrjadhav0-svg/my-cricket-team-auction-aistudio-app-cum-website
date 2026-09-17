@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Printer,
   ChevronRight,
+  Share2,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { Team, Player } from '../types';
@@ -17,6 +18,7 @@ import {
   getRoleBadgeStyle,
   getTeamStatusBadge,
 } from '../utils/formatters';
+import { AuctionExportModal } from './AuctionExportModal';
 
 interface TeamSquadsViewProps {
   initialTeamId?: string;
@@ -26,6 +28,7 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
   initialTeamId,
 }) => {
   const { state } = useAuction();
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   const teams = state?.teams || [];
   const defaultId = initialTeamId || teams[0]?.id || '';
@@ -40,10 +43,8 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
 
   // Squad players for current team
   const squadPlayers = players.filter((p) => p.soldToTeamId === currentTeam.id);
-  const iconPlayers = squadPlayers.filter((p) => p.isIcon);
-  const auctionPlayers = squadPlayers.filter((p) => !p.isIcon);
 
-  // Compute village counts for current team
+  // Compute village counts for current team (unrestricted)
   const villageCounts: Record<string, number> = {};
   squadPlayers.forEach((p) => {
     villageCounts[p.village] = (villageCounts[p.village] || 0) + 1;
@@ -57,6 +58,11 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12 max-w-7xl mx-auto">
+      <AuctionExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+      />
+
       {/* Team Tabs Selector */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
         {teams.map((team) => {
@@ -113,7 +119,7 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Purse: {formatPoints(settings.startingPoints)} pts • {settings.iconPlayersPerTeam} Icons • {settings.auctionPlayersPerTeam} Auction Players ({settings.maxSquadSize} Max)
+                Purse: {formatPoints(settings.startingPoints)} pts • Max Squad Limit: {settings.maxSquadSize} Players (Open Village Selection)
               </p>
             </div>
           </div>
@@ -150,21 +156,29 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
             </div>
 
             <button
+              onClick={() => setIsExportOpen(true)}
+              className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <Share2 className="w-4 h-4 text-indigo-600" />
+              <span>Share / Excel</span>
+            </button>
+
+            <button
               onClick={handlePrint}
               className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-semibold flex items-center gap-1.5 transition-colors"
             >
-              <Printer className="w-4 h-4 text-indigo-600" />
+              <Printer className="w-4 h-4 text-slate-700" />
               <span>Print Squad</span>
             </button>
           </div>
         </div>
 
-        {/* Village Quota Breakdown Chips */}
+        {/* Village Representation Chips */}
         <div className="pt-3 border-t border-slate-100">
           <div className="flex items-center gap-2 mb-2">
             <MapPin className="w-3.5 h-3.5 text-indigo-600" />
             <span className="text-xs font-['Outfit'] font-bold text-slate-700 uppercase tracking-wider">
-              Zone & Village Roster Count (Limit: {settings.maxVillageLimit >= 90 ? 'None' : settings.maxVillageLimit})
+              Villages Represented in Squad ({Object.keys(villageCounts).length} Villages)
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -172,19 +186,14 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
               <span className="text-xs text-slate-400 italic">No players acquired yet.</span>
             ) : (
               Object.entries(villageCounts).map(([village, count]) => {
-                const isLimitReached = count >= settings.maxVillageLimit;
                 return (
                   <span
                     key={village}
-                    className={`text-xs px-2.5 py-1 rounded-lg border font-medium flex items-center gap-1.5 ${
-                      isLimitReached
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-slate-50 text-slate-700 border-slate-200'
-                    }`}
+                    className="text-xs px-2.5 py-1 rounded-lg border font-medium flex items-center gap-1.5 bg-slate-50 text-slate-700 border-slate-200"
                   >
                     <span>{village}:</span>
-                    <span className="font-mono font-bold">
-                      {count}/{settings.maxVillageLimit}
+                    <span className="font-mono font-bold text-indigo-600">
+                      {count} {count === 1 ? 'player' : 'players'}
                     </span>
                   </span>
                 );
@@ -213,10 +222,9 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
             <thead className="bg-slate-50 text-slate-500 font-['Outfit'] uppercase tracking-wider text-[11px] border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4 font-bold">SLOT #</th>
-                <th className="py-3 px-3 font-bold">TYPE</th>
                 <th className="py-3 px-4 font-bold">PLAYER NAME</th>
                 <th className="py-3 px-3 font-bold">ROLE</th>
-                <th className="py-3 px-3 font-bold">ZONE / VILLAGE</th>
+                <th className="py-3 px-3 font-bold">VILLAGE</th>
                 <th className="py-3 px-4 font-bold text-right">POINTS ALLOCATED</th>
               </tr>
             </thead>
@@ -224,7 +232,6 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
               {Array.from({ length: settings.maxSquadSize }).map((_, index) => {
                 const slotNumber = index + 1;
                 const player = squadPlayers[index];
-                const isIconSlot = slotNumber <= settings.iconPlayersPerTeam;
 
                 if (player) {
                   const roleStyle = getRoleBadgeStyle(player.role);
@@ -233,19 +240,9 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                       <td className="py-3 px-4 font-mono font-bold text-slate-500">
                         #{slotNumber}
                       </td>
-                      <td className="py-3 px-3">
-                        <span
-                          className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-wider ${
-                            player.isIcon
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}
-                        >
-                          {player.isIcon ? 'ICON' : 'AUCTION'}
-                        </span>
-                      </td>
                       <td className="py-3 px-4 font-['Outfit'] font-bold text-slate-900">
-                        {player.code} - {player.name}
+                        <span className="font-mono text-indigo-600 mr-2">{player.code}</span>
+                        {player.name}
                       </td>
                       <td className="py-3 px-3">
                         <span
@@ -266,12 +263,7 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                 return (
                   <tr key={`empty-${index}`} className="bg-slate-50/40 text-slate-400">
                     <td className="py-3 px-4 font-mono font-semibold">#{slotNumber}</td>
-                    <td className="py-3 px-3">
-                      <span className="text-[9px] px-2 py-0.5 rounded border border-dashed border-slate-300 text-slate-400">
-                        {isIconSlot ? 'ICON SLOT' : 'AUCTION SLOT'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 italic text-slate-400">Empty Roster Slot</td>
+                    <td className="py-3 px-4 italic text-slate-400">Available Squad Slot</td>
                     <td className="py-3 px-3">—</td>
                     <td className="py-3 px-3">—</td>
                     <td className="py-3 px-4 text-right font-mono text-slate-400">—</td>

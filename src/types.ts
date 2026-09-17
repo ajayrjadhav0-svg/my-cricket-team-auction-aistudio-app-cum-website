@@ -1,6 +1,6 @@
 export type PlayerRole = 'Batsman' | 'Bowler' | 'All-Rounder' | 'Wicket-Keeper';
 
-export type PlayerStatus = 'AVAILABLE' | 'SOLD' | 'UNSOLD' | 'ICON';
+export type PlayerStatus = 'AVAILABLE' | 'SOLD' | 'UNSOLD';
 
 export interface Player {
   id: number;
@@ -12,7 +12,6 @@ export interface Player {
   status: PlayerStatus;
   soldToTeamId: string | null;
   soldPrice: number;
-  isIcon: boolean;
   soldAt?: string;
 }
 
@@ -48,7 +47,6 @@ export interface AuctionTransaction {
   teamName: string;
   soldPrice: number;
   committeeCharge: number;
-  isIcon: boolean;
 }
 
 export interface LiveBiddingState {

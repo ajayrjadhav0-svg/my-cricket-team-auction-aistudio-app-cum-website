@@ -89,8 +89,8 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
                         {team.totalPlayers}/{settings.maxSquadSize} Players
                       </span>
                       <span className="text-slate-300">•</span>
-                      <span className="text-[10px] text-amber-600 font-semibold">
-                        {team.iconPlayersCount} Icons
+                      <span className="text-[10px] text-indigo-600 font-semibold">
+                        {Math.max(0, settings.maxSquadSize - team.totalPlayers)} Slots Left
                       </span>
                     </div>
                   </div>

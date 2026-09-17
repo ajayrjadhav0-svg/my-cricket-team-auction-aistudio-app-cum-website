@@ -75,7 +75,6 @@ export const LiveAuctionView: React.FC = () => {
       status: 'AVAILABLE',
       soldToTeamId: null,
       soldPrice: 0,
-      isIcon: false,
     };
 
   // If no team is selected yet, default to the first team or bidding.selectedTeamId
@@ -253,7 +252,7 @@ export const LiveAuctionView: React.FC = () => {
                     </div>
                     <span
                       className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase ${
-                        p.status === 'SOLD' || p.status === 'ICON'
+                        p.status === 'SOLD'
                           ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                           : p.status === 'UNSOLD'
                           ? 'bg-amber-100 text-amber-800 border-amber-200'
@@ -297,11 +296,6 @@ export const LiveAuctionView: React.FC = () => {
             <div className="p-5 md:p-6 text-center space-y-4">
               <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-100 border border-slate-200 flex items-center justify-center text-4xl shadow-2xs relative">
                 🏏
-                {currentPlayer.isIcon && (
-                  <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[10px] uppercase shadow-sm">
-                    ICON
-                  </span>
-                )}
               </div>
 
               <div>
@@ -340,7 +334,7 @@ export const LiveAuctionView: React.FC = () => {
                   <span className="text-amber-700 font-bold">Player currently UNSOLD</span>
                 )}
 
-                {role === 'admin' && !currentPlayer.isIcon && (
+                {role === 'admin' && (
                   <button
                     onClick={() => reopenPlayer(currentPlayer.id)}
                     className="mt-2 text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center justify-center gap-1 mx-auto"

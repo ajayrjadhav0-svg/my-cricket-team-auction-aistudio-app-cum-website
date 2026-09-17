@@ -11,6 +11,7 @@ import {
   Check,
   Eye,
   X,
+  LogOut,
 } from 'lucide-react';
 import { ActiveNav } from '../types';
 import { useAuction } from '../context/AuctionContext';
@@ -29,20 +30,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { state, role, setRole, getViewerShareUrl, showNotification } = useAuction();
+  const { state, role, logoutAdmin, getViewerShareUrl, showNotification } = useAuction();
   const summary = state?.summary;
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const navItems: { id: ActiveNav; label: string; icon: React.ReactNode; badge?: string; adminOnly?: boolean }[] = [
+  // Public navigation items. Admin panel is removed from screen and hidden inside Settings.
+  const navItems: { id: ActiveNav; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'dashboard', label: 'DASHBOARD', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'live-auction', label: 'LIVE AUCTION', icon: <Gavel className="w-5 h-5" />, badge: 'LIVE' },
-    { id: 'admin', label: 'ADMIN PANEL', icon: <Shield className="w-5 h-5 text-indigo-600" />, badge: 'ADMIN' },
     { id: 'players', label: 'PLAYERS', icon: <Users className="w-5 h-5" /> },
     { id: 'teams', label: 'TEAMS', icon: <Shield className="w-5 h-5" /> },
     { id: 'team-squads', label: 'TEAM SQUADS', icon: <Trophy className="w-5 h-5" /> },
     { id: 'auction-history', label: 'AUCTION HISTORY', icon: <History className="w-5 h-5" /> },
     { id: 'settings', label: 'SETTINGS', icon: <Settings className="w-5 h-5" /> },
   ];
+
+  const visibleNavItems = navItems;
 
   const handleCopyViewerLink = () => {
     const link = getViewerShareUrl();
@@ -97,21 +100,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${role === 'admin' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${role === 'admin' ? 'bg-indigo-600' : 'bg-emerald-500'}`}></span>
             </span>
             <span className="text-slate-700 font-semibold">
-              {role === 'admin' ? 'Admin Active' : 'Live Spectator'}
+              {role === 'admin' ? 'Admin Active' : 'Spectator (Viewer)'}
             </span>
           </div>
-          <span className="text-[11px] font-mono text-indigo-600 font-bold">
-            {summary ? `${summary.playersSold}/${summary.totalPlayers} Sold` : 'Syncing...'}
-          </span>
+
+          {role === 'admin' && (
+            <button
+              onClick={() => logoutAdmin()}
+              title="Exit Admin to Spectator View"
+              className="text-[10px] text-slate-500 hover:text-rose-600 font-bold flex items-center gap-1 transition-colors"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>Exit Admin</span>
+            </button>
+          )}
         </div>
 
         {/* Navigation Items */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = activeNav === item.id;
             const isAdminTab = item.id === 'admin';
 

@@ -25,8 +25,6 @@ export function getRoleBadgeStyle(role: string): { bg: string; text: string; bor
 
 export function getStatusBadgeStyle(status: string): { bg: string; text: string; border: string } {
   switch (status) {
-    case 'ICON':
-      return { bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-500/40' };
     case 'SOLD':
       return { bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/40' };
     case 'AVAILABLE':

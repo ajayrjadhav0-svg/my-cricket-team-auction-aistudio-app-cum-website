@@ -11,6 +11,7 @@ import { TeamSquadsView } from './components/TeamSquadsView';
 import { AuctionHistoryView } from './components/AuctionHistoryView';
 import { SettingsView } from './components/SettingsView';
 import { AdminPanel } from './components/AdminPanel';
+import { AdminAccessGate } from './components/admin/AdminAccessGate';
 import {
   LayoutDashboard,
   Gavel,
@@ -68,7 +69,16 @@ function AuctionAppContent() {
 
           {activeNav === 'live-auction' && <LiveAuctionView />}
 
-          {activeNav === 'admin' && <AdminPanel onSelectNav={setActiveNav} />}
+          {activeNav === 'admin' && (
+            role === 'admin' ? (
+              <AdminPanel onSelectNav={setActiveNav} />
+            ) : (
+              <AdminAccessGate
+                onUnlockSuccess={() => setActiveNav('admin')}
+                onReturnToDashboard={() => setActiveNav('dashboard')}
+              />
+            )
+          )}
 
           {activeNav === 'players' && (
             <PlayersView onNavigateToAuction={handleNavigateToAuction} />
@@ -87,7 +97,7 @@ function AuctionAppContent() {
 
           {activeNav === 'auction-history' && <AuctionHistoryView />}
 
-          {activeNav === 'settings' && <SettingsView />}
+          {activeNav === 'settings' && <SettingsView onSelectNav={setActiveNav} />}
         </main>
 
         {/* Mobile Bottom Quick Navigation Bar */}
@@ -121,20 +131,6 @@ function AuctionAppContent() {
             </div>
             <span>Auction</span>
           </button>
-
-          {role === 'admin' && (
-            <button
-              onClick={() => setActiveNav('admin')}
-              className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-['Outfit'] font-bold ${
-                activeNav === 'admin'
-                  ? 'text-indigo-600 font-extrabold'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <Shield className="w-4 h-4 text-indigo-600" />
-              <span>Admin</span>
-            </button>
-          )}
 
           <button
             onClick={() => setActiveNav('players')}
@@ -170,6 +166,18 @@ function AuctionAppContent() {
           >
             <History className="w-4 h-4" />
             <span>History</span>
+          </button>
+
+          <button
+            onClick={() => setActiveNav('settings')}
+            className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] font-['Outfit'] font-bold ${
+              activeNav === 'settings'
+                ? 'text-indigo-600'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Settings</span>
           </button>
         </div>
       </div>

@@ -15,7 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   onSelectNav,
 }) => {
-  const { state, refreshState, role, setRole, getViewerShareUrl, notification, clearNotification, showNotification } = useAuction();
+  const { state, refreshState, role, logoutAdmin, getViewerShareUrl, notification, clearNotification, showNotification } = useAuction();
   const summary = state?.summary;
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -69,31 +69,27 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Quick Metrics & Actions */}
       <div className="flex items-center gap-2">
-        {/* Viewer vs Admin Mode Pill */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
-          <button
-            onClick={() => setRole('viewer')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
-              role === 'viewer'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Eye className="w-3.5 h-3.5 text-sky-500" />
-            <span>Viewer</span>
-          </button>
-          <button
-            onClick={() => setRole('admin')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
-              role === 'admin'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Admin</span>
-          </button>
-        </div>
+        {/* Viewer vs Admin Mode Indicator */}
+        {role === 'admin' ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs">
+            <div className="flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="font-bold text-indigo-700 font-['Outfit']">Admin Mode</span>
+            </div>
+            <button
+              onClick={() => logoutAdmin()}
+              title="Exit Admin to Spectator View"
+              className="text-[11px] text-slate-500 hover:text-rose-600 font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:border-rose-300 transition-colors"
+            >
+              Exit
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600">
+            <Eye className="w-3.5 h-3.5 text-sky-600" />
+            <span className="font-semibold text-slate-700 hidden sm:inline">Spectator</span>
+          </div>
+        )}
 
         {/* Share Viewer Link Button */}
         <button
@@ -125,18 +121,6 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <RefreshCw className="w-4 h-4 text-emerald-600" />
         </button>
-
-        {/* Admin Panel Quick Jump (if not already on admin) */}
-        {role === 'admin' && activeNav !== 'admin' && (
-          <button
-            id="btn-header-admin-jump"
-            onClick={() => onSelectNav('admin')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs shadow-xs active:scale-95 transition-all"
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">ADMIN PANEL</span>
-          </button>
-        )}
 
         {/* Live Auction Quick Jump */}
         {activeNav !== 'live-auction' && (

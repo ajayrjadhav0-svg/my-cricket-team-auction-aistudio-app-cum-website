@@ -40,6 +40,55 @@ class AuctionDatabase {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (parsed && parsed.teams && parsed.players) {
+          // Automatic migration: strip icon allocations, remove zone limits & names
+          let needsSave = false;
+
+          const villageMap: Record<string, string> = {
+            'West Zone': 'Rampur',
+            'North Zone': 'Sonapur',
+            'South Zone': 'Alibaug',
+            'East Zone': 'Bori',
+            'Central Zone': 'Chandrapur',
+            'Overseas': 'Belapur',
+          };
+
+          parsed.players.forEach((p: Player) => {
+            if (p.village && villageMap[p.village]) {
+              p.village = villageMap[p.village];
+              needsSave = true;
+            }
+            if (p.isIcon || p.status === 'ICON') {
+              p.isIcon = false;
+              if (p.status === 'ICON') {
+                p.status = 'AVAILABLE';
+                p.soldToTeamId = null;
+                p.soldPrice = 0;
+              }
+              needsSave = true;
+            }
+          });
+
+          // Remove pre-allocated icon transactions
+          if (parsed.transactions) {
+            const originalLength = parsed.transactions.length;
+            parsed.transactions = parsed.transactions.filter((t: AuctionTransaction) => !t.isIcon && t.timestamp !== 'Pre-Auction Allocation');
+            if (parsed.transactions.length !== originalLength) needsSave = true;
+          }
+
+          if (parsed.settings) {
+            parsed.settings.maxVillageLimit = 9999;
+            parsed.settings.iconPlayersCount = 0;
+            parsed.settings.iconCostPerPlayer = 0;
+            parsed.settings.maxAuctionPlayers = parsed.settings.maxSquadSize || 15;
+            parsed.settings.auctionBudget = parsed.settings.startingPoints || 100000;
+          }
+
+          if (needsSave) {
+            this.state = parsed;
+            this.recalculateAllTeams();
+            this.saveToDisk();
+          }
+
           return parsed;
         }
       } catch (err) {
@@ -113,17 +162,17 @@ class AuctionDatabase {
 
   private calculateSummary(players: Player[], teams: Team[]): DashboardSummary {
     const totalPlayers = players.length;
-    const playersSold = players.filter(p => p.status === 'SOLD' || p.status === 'ICON').length;
+    const playersSold = players.filter(p => p.status === 'SOLD').length;
     const playersAvailable = players.filter(p => p.status === 'AVAILABLE').length;
     const playersUnsold = players.filter(p => p.status === 'UNSOLD').length;
 
     const auctionPointsSpent = players
-      .filter(p => p.status === 'SOLD' && !p.isIcon)
+      .filter(p => p.status === 'SOLD')
       .reduce((sum, p) => sum + (p.soldPrice || 0), 0);
 
     const totalCommitteeCash = teams.reduce((sum, t) => sum + (t.committeeCash || 0), 0);
     const auctionProgressPct = totalPlayers > 0 ? Math.round((playersSold / totalPlayers) * 100) : 0;
-    const completedTeamsCount = teams.filter(t => t.auctionPlayersCount >= this.state?.settings?.maxAuctionPlayers || 13).length;
+    const completedTeamsCount = teams.filter(t => t.totalPlayers >= (this.state?.settings?.maxSquadSize || 15)).length;
 
     return {
       totalPlayers,
@@ -156,19 +205,17 @@ class AuctionDatabase {
     villageCounts: Record<string, number>;
   } {
     const squad = this.state.players.filter(p => p.soldToTeamId === teamId);
-    const icons = squad.filter(p => p.isIcon);
-    const auctionPlayers = squad.filter(p => !p.isIcon);
 
     const villageCounts: Record<string, number> = {};
     squad.forEach(p => {
-      const zone = p.village || 'General';
-      villageCounts[zone] = (villageCounts[zone] || 0) + 1;
+      const village = p.village || 'General';
+      villageCounts[village] = (villageCounts[village] || 0) + 1;
     });
 
     return {
-      icons,
-      auctionPlayers,
-      total: [...icons, ...auctionPlayers],
+      icons: [],
+      auctionPlayers: squad,
+      total: squad,
       villageCounts,
     };
   }
@@ -178,42 +225,38 @@ class AuctionDatabase {
 
     this.state.teams = this.state.teams.map(team => {
       const squad = this.state.players.filter(p => p.soldToTeamId === team.id);
-      const iconPlayers = squad.filter(p => p.isIcon);
-      const auctionPlayers = squad.filter(p => !p.isIcon);
+      const totalPointsSpent = squad.reduce((sum, p) => sum + p.soldPrice, 0);
 
-      const iconCost = iconPlayers.reduce((sum, p) => sum + p.soldPrice, 0);
-      const auctionSpent = auctionPlayers.reduce((sum, p) => sum + p.soldPrice, 0);
-      const totalPointsSpent = iconCost + auctionSpent;
-
-      const effectiveBudget = (team.auctionBudget || settings.auctionBudget) + (settings.freePoints || 0);
-      const pointsRemaining = effectiveBudget - auctionSpent;
+      const effectiveBudget = (team.startingPoints || settings.startingPoints) + (settings.freePoints || 0);
+      const pointsRemaining = effectiveBudget - totalPointsSpent;
 
       // Extra points penalty cash / charge
-      const extraSpent = Math.max(0, auctionSpent - effectiveBudget);
+      const extraSpent = Math.max(0, totalPointsSpent - effectiveBudget);
       const committeeCash = extraSpent * (settings.extraPointsPenaltyRate || 1);
 
-      const auctionCount = auctionPlayers.length;
       const totalCount = squad.length;
-      const remainingSlots = Math.max(0, settings.maxAuctionPlayers - auctionCount);
+      const remainingSlots = Math.max(0, settings.maxSquadSize - totalCount);
 
       // Safe max bid calculation
       const reserveNeed = remainingSlots > 1 ? (remainingSlots - 1) * settings.minBidIncrement : 0;
       const maxSafeBid = remainingSlots > 0 ? Math.max(0, pointsRemaining - reserveNeed) : 0;
 
       let status: Team['status'] = 'OK';
-      if (auctionCount > settings.maxAuctionPlayers) {
+      if (totalCount > settings.maxSquadSize) {
         status = 'OVER 13 PLAYERS';
       } else if (pointsRemaining < 0) {
         status = 'OVER POINTS';
-      } else if (auctionCount === settings.maxAuctionPlayers) {
+      } else if (totalCount === settings.maxSquadSize) {
         status = 'FULL';
       }
 
       return {
         ...team,
         totalPlayers: totalCount,
-        iconPlayersCount: iconPlayers.length,
-        auctionPlayersCount: auctionCount,
+        iconPlayersCount: 0,
+        auctionPlayersCount: totalCount,
+        iconCost: 0,
+        auctionBudget: effectiveBudget,
         totalPointsSpent,
         pointsRemaining,
         maxSafeBid,
@@ -334,14 +377,15 @@ class AuctionDatabase {
     if (!player) return { valid: false, error: 'Player not found.' };
     if (!team) return { valid: false, error: 'Team not found.' };
 
-    if (player.status === 'SOLD' || player.status === 'ICON') {
-      return { valid: false, error: `Player is already ${player.status} to ${player.soldToTeamId}.` };
+    if (player.status === 'SOLD') {
+      return { valid: false, error: `Player is already SOLD to ${player.soldToTeamId}.` };
     }
 
-    if (team.auctionPlayersCount >= this.state.settings.maxAuctionPlayers) {
+    const maxSquad = this.state.settings.maxSquadSize || 15;
+    if (team.totalPlayers >= maxSquad) {
       return {
         valid: false,
-        error: `Team ${team.name} already has ${team.auctionPlayersCount} auction players (Max squad limit reached).`,
+        error: `Team ${team.name} already has ${team.totalPlayers} players (Max squad limit of ${maxSquad} reached).`,
       };
     }
 
@@ -349,18 +393,12 @@ class AuctionDatabase {
       return { valid: false, error: 'Winning bid must be greater than 0.' };
     }
 
-    // Check optional zone/village limit
     const squadInfo = this.getTeamSquad(teamId);
     const currentVillageCount = squadInfo.villageCounts[player.village] || 0;
 
     let warning: string | undefined;
-    if (this.state.settings.maxVillageLimit < 90 && currentVillageCount >= this.state.settings.maxVillageLimit) {
-      warning = `QUOTA REACHED – Team already has ${currentVillageCount} players from "${player.village}". (Limit: ${this.state.settings.maxVillageLimit})`;
-    }
-
     if (soldPrice > team.maxSafeBid && team.maxSafeBid > 0) {
-      const extraWarning = `Bid (${soldPrice.toLocaleString()}) exceeds Safe Max Bid (${team.maxSafeBid.toLocaleString()}). Will trigger extra points cash penalty.`;
-      warning = warning ? `${warning} | ${extraWarning}` : extraWarning;
+      warning = `Bid (${soldPrice.toLocaleString()}) exceeds Safe Max Bid (${team.maxSafeBid.toLocaleString()}). Will trigger extra points cash penalty.`;
     }
 
     return {
@@ -376,24 +414,12 @@ class AuctionDatabase {
     playerId: number,
     teamId: string,
     soldPrice: number,
-    adminOverride: boolean = false
+    _adminOverride: boolean = false
   ): { success: boolean; message: string; state?: FullAuctionState } {
     const validation = this.validateSale(playerId, teamId, soldPrice);
 
     if (!validation.valid) {
       return { success: false, message: validation.error || 'Invalid sale' };
-    }
-
-    if (
-      this.state.settings.maxVillageLimit < 90 &&
-      validation.villageCount &&
-      validation.villageCount >= this.state.settings.maxVillageLimit &&
-      !adminOverride
-    ) {
-      return {
-        success: false,
-        message: validation.warning || 'Regional quota limit reached. Admin override required.',
-      };
     }
 
     const player = this.getPlayer(playerId)!;
@@ -463,10 +489,6 @@ class AuctionDatabase {
   public reopenPlayer(playerId: number): { success: boolean; message: string; state: FullAuctionState } {
     const player = this.getPlayer(playerId);
     if (!player) return { success: false, message: 'Player not found', state: this.state };
-
-    if (player.isIcon) {
-      return { success: false, message: 'Cannot reopen an Icon Player directly.', state: this.state };
-    }
 
     player.status = 'AVAILABLE';
     player.soldToTeamId = null;
