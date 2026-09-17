@@ -1,0 +1,54 @@
+export function formatPoints(val: number): string {
+  if (val === undefined || val === null || isNaN(val)) return '0';
+  return val.toLocaleString('en-IN');
+}
+
+export function formatINR(val: number): string {
+  if (val === undefined || val === null || isNaN(val)) return '₹0';
+  return '₹' + val.toLocaleString('en-IN');
+}
+
+export function getRoleBadgeStyle(role: string): { bg: string; text: string; border: string } {
+  switch (role) {
+    case 'All-Rounder':
+      return { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' };
+    case 'Batsman':
+      return { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' };
+    case 'Bowler':
+      return { bg: 'bg-sky-500/15', text: 'text-sky-400', border: 'border-sky-500/30' };
+    case 'Wicket-Keeper':
+      return { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30' };
+    default:
+      return { bg: 'bg-zinc-500/15', text: 'text-zinc-400', border: 'border-zinc-500/30' };
+  }
+}
+
+export function getStatusBadgeStyle(status: string): { bg: string; text: string; border: string } {
+  switch (status) {
+    case 'ICON':
+      return { bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-500/40' };
+    case 'SOLD':
+      return { bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/40' };
+    case 'AVAILABLE':
+      return { bg: 'bg-sky-500/20', text: 'text-sky-300', border: 'border-sky-500/40' };
+    case 'UNSOLD':
+      return { bg: 'bg-rose-500/20', text: 'text-rose-300', border: 'border-rose-500/40' };
+    default:
+      return { bg: 'bg-zinc-500/20', text: 'text-zinc-300', border: 'border-zinc-500/40' };
+  }
+}
+
+export function getTeamStatusBadge(status: string): { bg: string; text: string; border: string } {
+  switch (status) {
+    case 'OK':
+      return { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/40' };
+    case 'FULL':
+      return { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40' };
+    case 'OVER POINTS':
+      return { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/40' };
+    case 'OVER 13 PLAYERS':
+      return { bg: 'bg-rose-500/20', text: 'text-rose-400', border: 'border-rose-500/40' };
+    default:
+      return { bg: 'bg-zinc-500/20', text: 'text-zinc-400', border: 'border-zinc-500/40' };
+  }
+}
