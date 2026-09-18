@@ -77,7 +77,6 @@ export const ConfirmSaleModal: React.FC<ConfirmSaleModalProps> = ({
                 >
                   {player.role}
                 </span>
-                <span className="text-xs text-slate-500 font-medium">Zone: {player.village}</span>
               </div>
               <h4 className="font-['Outfit'] font-black text-xl text-slate-900">
                 {player.name}

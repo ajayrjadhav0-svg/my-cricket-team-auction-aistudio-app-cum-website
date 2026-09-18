@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Printer,
@@ -12,6 +12,10 @@ import {
   Coins,
   MapPin,
   ExternalLink,
+  FileCode,
+  Smartphone,
+  Database,
+  Archive,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { formatPoints, formatINR } from '../utils/formatters';
@@ -29,11 +33,59 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
   const [copiedText, setCopiedText] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeTab, setActiveTab] = useState<'options' | 'print-preview'>('options');
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    });
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setIsInstalled(true);
+        showNotification('success', 'App installed successfully!');
+      }
+      setDeferredPrompt(null);
+    } else {
+      showNotification(
+        'info',
+        'To install on Android: In Chrome, tap ⋮ (menu) > "Install App" or "Add to Home Screen"'
+      );
+    }
+  };
 
   if (!isOpen || !state) return null;
 
   const { settings, teams, players, transactions, summary } = state;
   const soldPlayers = players.filter((p) => p.status === 'SOLD');
+
+  const handleDownloadHTML = () => {
+    window.location.href = '/api/export/html';
+    showNotification('success', 'Downloading standalone offline HTML auction report...');
+  };
+
+  const handleOpenHTML = () => {
+    window.open('/api/export/html?view=1', '_blank');
+  };
+
+  const handleDownloadJSON = () => {
+    window.location.href = '/api/export/json';
+    showNotification('success', 'Downloading complete JSON database backup...');
+  };
 
   // Generate plain-text summary for sharing (WhatsApp, Telegram, Notes)
   const generateShareableText = () => {
@@ -54,7 +106,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
         text += `  _(No players acquired yet)_\n`;
       } else {
         squad.forEach((p, idx) => {
-          text += `  ${idx + 1}. ${p.name} (${p.village}) - ${p.role} [${formatPoints(p.soldPrice)} pts]\n`;
+          text += `  ${idx + 1}. ${p.name} - ${p.role} [${formatPoints(p.soldPrice)} pts]\n`;
         });
       }
     });
@@ -105,27 +157,27 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
   };
 
   const handleExportPlayersCSV = () => {
-    const headers = 'Player ID,Code,Player Name,Village,Role,Status,Purchased By Team,Sold Price (Points)\n';
+    const headers = 'Player ID,Code,Player Name,Role,Status,Purchased By Team,Sold Price (Points)\n';
     const rows = players
       .map((p) => {
         const team = p.soldToTeamId ? teams.find((t) => t.id === p.soldToTeamId)?.name : 'AVAILABLE/UNSOLD';
-        return `${p.id},"${p.code}","${p.name.replace(/"/g, '""')}","${p.village.replace(/"/g, '""')}","${p.role}","${p.status}","${(team || '').replace(/"/g, '""')}",${p.soldPrice}`;
+        return `${p.id},"${p.code}","${p.name.replace(/"/g, '""')}","${p.role}","${p.status}","${(team || '').replace(/"/g, '""')}",${p.soldPrice}`;
       })
       .join('\n');
     downloadCSV(headers + rows, `${settings.tournamentName.toLowerCase().replace(/\s+/g, '_')}_players.csv`);
   };
 
   const handleExportSquadsCSV = () => {
-    const headers = 'Team Name,Short Code,Squad Size,Points Spent,Points Remaining,Player Name,Village,Role,Sold Price (Points)\n';
+    const headers = 'Team Name,Short Code,Squad Size,Points Spent,Points Remaining,Player Name,Role,Sold Price (Points)\n';
     const rows: string[] = [];
     teams.forEach((team) => {
       const squad = players.filter((p) => p.soldToTeamId === team.id);
       if (squad.length === 0) {
-        rows.push(`"${team.name.replace(/"/g, '""')}","${team.shortCode}",0,0,${team.pointsRemaining},"NO PLAYERS YET","","",""`);
+        rows.push(`"${team.name.replace(/"/g, '""')}","${team.shortCode}",0,0,${team.pointsRemaining},"NO PLAYERS YET","",""`);
       } else {
         squad.forEach((p) => {
           rows.push(
-            `"${team.name.replace(/"/g, '""')}","${team.shortCode}",${squad.length},${team.totalPointsSpent},${team.pointsRemaining},"${p.name.replace(/"/g, '""')}","${p.village.replace(/"/g, '""')}","${p.role}",${p.soldPrice}`
+            `"${team.name.replace(/"/g, '""')}","${team.shortCode}",${squad.length},${team.totalPointsSpent},${team.pointsRemaining},"${p.name.replace(/"/g, '""')}","${p.role}",${p.soldPrice}`
           );
         });
       }
@@ -134,10 +186,10 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
   };
 
   const handleExportLedgerCSV = () => {
-    const headers = 'Timestamp,Auction Order,Player ID,Player Name,Village,Role,Purchased By Team,Sold Price (Points),Penalty Cash (INR)\n';
+    const headers = 'Timestamp,Auction Order,Player ID,Player Name,Role,Purchased By Team,Sold Price (Points),Penalty Cash (INR)\n';
     const rows = transactions
       .map((t) => {
-        return `"${t.timestamp}",${t.auctionOrder},"P${t.playerId.toString().padStart(3, '0')}","${t.playerName.replace(/"/g, '""')}","${t.village.replace(/"/g, '""')}","${t.role}","${t.teamName.replace(/"/g, '""')}",${t.soldPrice},${t.committeeCharge}`;
+        return `"${t.timestamp}",${t.auctionOrder},"P${t.playerId.toString().padStart(3, '0')}","${t.playerName.replace(/"/g, '""')}","${t.role}","${t.teamName.replace(/"/g, '""')}",${t.soldPrice},${t.committeeCharge}`;
       })
       .join('\n');
     downloadCSV(headers + rows, `${settings.tournamentName.toLowerCase().replace(/\s+/g, '_')}_auction_ledger.csv`);
@@ -216,7 +268,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                       Instant Print or Save as PDF
                     </h3>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      Formats all teams, bought players, prices, and village allocations into a clean, ready-to-print document.
+                      Formats all teams, bought players, and prices into a clean, ready-to-print document.
                     </p>
                   </div>
                 </div>
@@ -249,7 +301,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                         All Players Roster
                       </h4>
                       <p className="text-xs text-slate-500 mt-1">
-                        All {players.length} players with village, role, sale status, franchise team, and final price.
+                        All {players.length} players with role, sale status, franchise team, and final price.
                       </p>
                     </div>
 
@@ -310,6 +362,132 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                       <span>Download Ledger CSV</span>
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Standalone HTML & Full Data Backup Section */}
+              <div>
+                <h3 className="font-['Outfit'] font-bold text-xs text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <FileCode className="w-4 h-4 text-indigo-600" />
+                  <span>STANDALONE OFFLINE HTML & DATABASE BACKUP</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Standalone HTML File Card */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-purple-50/70 border border-indigo-200 hover:shadow-sm transition-all flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs mb-2 shadow-xs">
+                        <FileCode className="w-4 h-4" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
+                          Standalone Offline HTML (.html)
+                        </h4>
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-indigo-600 text-white uppercase">
+                          Single File
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        Complete self-contained HTML report with embedded styles, all team squads, ledger, and live search. Runs completely offline in any web browser without internet or servers.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleDownloadHTML}
+                        id="btn-download-standalone-html"
+                        className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download .HTML</span>
+                      </button>
+                      <button
+                        onClick={handleOpenHTML}
+                        id="btn-open-standalone-html"
+                        className="py-2 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-['Outfit'] font-bold text-xs border border-slate-200 flex items-center gap-1 transition-all"
+                        title="Open HTML in new tab"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Open</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Full Database Backup Card */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs mb-2">
+                        <Database className="w-4 h-4 text-slate-800" />
+                      </div>
+                      <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
+                        Complete JSON Backup (.json)
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Full machine-readable snapshot containing all tournament rules, team budgets, player rosters, and bid transactions.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleDownloadJSON}
+                      id="btn-download-backup-json"
+                      className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-300" />
+                      <span>Download JSON Backup</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mobile App & Android APK Section */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 border border-emerald-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Smartphone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-['Outfit'] font-black text-slate-900 text-sm sm:text-base">
+                          Install Android App / WebAPK
+                        </h4>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          PWA Ready
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Install directly onto your Android device or PC as a standalone app with home screen icon and offline support.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleInstallApp}
+                      id="btn-install-android-pwa"
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-['Outfit'] font-bold text-xs shadow-sm flex items-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Install App Now</span>
+                    </button>
+                    <a
+                      href={`https://www.pwabuilder.com/?site=${encodeURIComponent(window.location.origin)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-['Outfit'] font-bold text-xs border border-emerald-300 flex items-center gap-1 transition-all"
+                      title="Generate signed APK file via PWABuilder"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Get .APK File</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-600 bg-white/70 p-3 rounded-xl border border-emerald-100 space-y-1">
+                  <span className="font-bold text-emerald-900 block">📱 How to install directly on your Android phone:</span>
+                  <p>1. Open this website in <strong>Google Chrome</strong> on your Android device.</p>
+                  <p>2. Tap the <strong>three dots (⋮)</strong> in the top right corner.</p>
+                  <p>3. Tap <strong>"Install App"</strong> (or <strong>"Add to Home Screen"</strong>). Android will compile a native WebAPK icon on your home screen!</p>
                 </div>
               </div>
 
@@ -474,7 +652,6 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                               <tr>
                                 <th className="py-1.5 px-3">#</th>
                                 <th className="py-1.5 px-3">Player Name</th>
-                                <th className="py-1.5 px-3">Village</th>
                                 <th className="py-1.5 px-3">Role</th>
                                 <th className="py-1.5 px-3 text-right">Winning Price</th>
                               </tr>
@@ -484,7 +661,6 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                                 <tr key={p.id}>
                                   <td className="py-1.5 px-3 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
                                   <td className="py-1.5 px-3 font-bold text-slate-900">{p.name}</td>
-                                  <td className="py-1.5 px-3 text-slate-600">{p.village}</td>
                                   <td className="py-1.5 px-3 text-slate-600">{p.role}</td>
                                   <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
                                     {formatPoints(p.soldPrice)} pts

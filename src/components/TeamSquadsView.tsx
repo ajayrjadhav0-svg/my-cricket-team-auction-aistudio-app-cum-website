@@ -44,12 +44,6 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
   // Squad players for current team
   const squadPlayers = players.filter((p) => p.soldToTeamId === currentTeam.id);
 
-  // Compute village counts for current team (unrestricted)
-  const villageCounts: Record<string, number> = {};
-  squadPlayers.forEach((p) => {
-    villageCounts[p.village] = (villageCounts[p.village] || 0) + 1;
-  });
-
   const statusBadge = getTeamStatusBadge(currentTeam.status);
 
   const handlePrint = () => {
@@ -119,7 +113,7 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Purse: {formatPoints(settings.startingPoints)} pts • Max Squad Limit: {settings.maxSquadSize} Players (Open Village Selection)
+                Purse: {formatPoints(settings.startingPoints)} pts • Max Squad Limit: {settings.maxSquadSize} Players
               </p>
             </div>
           </div>
@@ -172,35 +166,6 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Village Representation Chips */}
-        <div className="pt-3 border-t border-slate-100">
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="text-xs font-['Outfit'] font-bold text-slate-700 uppercase tracking-wider">
-              Villages Represented in Squad ({Object.keys(villageCounts).length} Villages)
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {Object.keys(villageCounts).length === 0 ? (
-              <span className="text-xs text-slate-400 italic">No players acquired yet.</span>
-            ) : (
-              Object.entries(villageCounts).map(([village, count]) => {
-                return (
-                  <span
-                    key={village}
-                    className="text-xs px-2.5 py-1 rounded-lg border font-medium flex items-center gap-1.5 bg-slate-50 text-slate-700 border-slate-200"
-                  >
-                    <span>{village}:</span>
-                    <span className="font-mono font-bold text-indigo-600">
-                      {count} {count === 1 ? 'player' : 'players'}
-                    </span>
-                  </span>
-                );
-              })
-            )}
-          </div>
-        </div>
       </div>
 
       {/* SQUAD SLOTS (15 SLOTS DISPLAY) */}
@@ -224,7 +189,6 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                 <th className="py-3 px-4 font-bold">SLOT #</th>
                 <th className="py-3 px-4 font-bold">PLAYER NAME</th>
                 <th className="py-3 px-3 font-bold">ROLE</th>
-                <th className="py-3 px-3 font-bold">VILLAGE</th>
                 <th className="py-3 px-4 font-bold text-right">POINTS ALLOCATED</th>
               </tr>
             </thead>
@@ -251,7 +215,6 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                           {player.role}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-slate-700">{player.village}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
                         {formatPoints(player.soldPrice)} pts
                       </td>
@@ -264,7 +227,6 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                   <tr key={`empty-${index}`} className="bg-slate-50/40 text-slate-400">
                     <td className="py-3 px-4 font-mono font-semibold">#{slotNumber}</td>
                     <td className="py-3 px-4 italic text-slate-400">Available Squad Slot</td>
-                    <td className="py-3 px-3">—</td>
                     <td className="py-3 px-3">—</td>
                     <td className="py-3 px-4 text-right font-mono text-slate-400">—</td>
                   </tr>

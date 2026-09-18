@@ -6,7 +6,6 @@ export interface Player {
   id: number;
   code: string; // e.g. "P001"
   name: string;
-  village: string;
   role: PlayerRole;
   auctionOrder: number;
   status: PlayerStatus;
@@ -42,7 +41,6 @@ export interface AuctionTransaction {
   auctionOrder: number;
   playerId: number;
   playerName: string;
-  village: string;
   role: PlayerRole;
   teamId: string;
   teamName: string;
@@ -72,8 +70,6 @@ export interface TournamentSettings {
   extraPointsPenaltyRate: number;
   minBidIncrement: number;
   defaultReservePrice: number;
-  maxVillageLimit: number;
-  allowVillageOverride: boolean;
 }
 
 export interface DashboardSummary {

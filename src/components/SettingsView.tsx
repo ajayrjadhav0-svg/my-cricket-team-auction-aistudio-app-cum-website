@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings,
   Shield,
@@ -13,6 +13,11 @@ import {
   Eye,
   Lock,
   ArrowRight,
+  FileCode,
+  Smartphone,
+  ExternalLink,
+  Archive,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { ActiveNav } from '../types';
@@ -29,6 +34,54 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onSelectNav }) => {
   const [confirmMode, setConfirmMode] = useState<'official' | 'pre-auction' | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    });
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setIsInstalled(true);
+        showNotification('success', 'Cricket Auction App installed successfully!');
+      }
+      setDeferredPrompt(null);
+    } else {
+      showNotification(
+        'info',
+        'To install on Android: In Chrome, tap ⋮ (menu) > "Install App" or "Add to Home Screen"'
+      );
+    }
+  };
+
+  const handleDownloadHTML = () => {
+    window.location.href = '/api/export/html';
+    showNotification('success', 'Downloading standalone offline HTML auction report...');
+  };
+
+  const handleOpenHTML = () => {
+    window.open('/api/export/html?view=1', '_blank');
+  };
+
+  const handleDownloadJSON = () => {
+    window.location.href = '/api/export/json';
+    showNotification('success', 'Downloading complete JSON database backup...');
+  };
 
   if (!state) {
     return <div className="p-8 text-slate-400">Loading settings...</div>;
@@ -121,13 +174,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onSelectNav }) => {
               ₹{settings.extraPointsPenaltyRate || 1} per point over free budget
             </span>
           </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-[10px] text-slate-500 block font-semibold uppercase">Village Limit</span>
-            <span className="font-mono font-bold text-base text-emerald-600 mt-1 block">
-              No Limit (Open)
-            </span>
-          </div>
         </div>
       </div>
 
@@ -213,6 +259,135 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onSelectNav }) => {
             <Share2 className="w-3.5 h-3.5" />
             <span>Copy Live Spectator URL</span>
           </button>
+        </div>
+      </div>
+
+      {/* SAVE ALL FILES, STANDALONE HTML & ANDROID APK SECTION */}
+      <div className="p-5 md:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-indigo-600" />
+            <h3 className="font-['Outfit'] font-black text-base text-slate-900">
+              SAVE ALL FILES, STANDALONE HTML & ANDROID APK
+            </h3>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Export self-contained offline files, download complete database backups, or install the app directly on your Android phone.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Card 1: Standalone HTML File */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-blue-50/70 border border-indigo-200 flex flex-col justify-between space-y-3">
+            <div>
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs mb-2.5 shadow-2xs">
+                <FileCode className="w-4 h-4" />
+              </div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
+                  Standalone HTML File
+                </h4>
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-600 text-white uppercase">
+                  .HTML
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Single self-contained file with all teams, players, prices, and ledger embedded. Opens in any browser 100% offline without needing a server.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={handleDownloadHTML}
+                id="btn-settings-download-html"
+                className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download HTML</span>
+              </button>
+              <button
+                onClick={handleOpenHTML}
+                id="btn-settings-open-html"
+                className="py-2 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-['Outfit'] font-bold text-xs border border-slate-200 flex items-center gap-1 transition-all"
+                title="Open in new tab"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Open</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Install Android App (APK / PWA) */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/70 to-teal-50/70 border border-emerald-200 flex flex-col justify-between space-y-3">
+            <div>
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs mb-2.5 shadow-2xs">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
+                  Android APK / Mobile App
+                </h4>
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-600 text-white uppercase">
+                  APK
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Install as a full native Android WebAPK app with home screen icon and offline support. Or download ready-to-sideload signed APK via PWABuilder.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={handleInstallApp}
+                id="btn-settings-install-app"
+                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Install App</span>
+              </button>
+              <a
+                href={`https://www.pwabuilder.com/?site=${encodeURIComponent(window.location.origin)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2 px-3 rounded-xl bg-white hover:bg-slate-50 text-emerald-800 font-['Outfit'] font-bold text-xs border border-emerald-300 flex items-center gap-1 transition-all"
+                title="Package as signed APK via PWABuilder"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Get .APK</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Card 3: Save All Files / Full Database Backup */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
+            <div>
+              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs mb-2.5 shadow-2xs">
+                <Database className="w-4 h-4 text-indigo-400" />
+              </div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
+                  Save All Files & Backup
+                </h4>
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 uppercase">
+                  JSON / ZIP
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Download a complete JSON database snapshot of all rules, franchises, players, and hammer transactions. To export all code files, use AI Studio's top Settings &gt; Export to ZIP.
+              </p>
+            </div>
+
+            <div className="pt-1">
+              <button
+                onClick={handleDownloadJSON}
+                id="btn-settings-download-json"
+                className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Download All Data (.JSON)</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

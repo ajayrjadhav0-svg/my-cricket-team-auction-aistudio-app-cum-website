@@ -9,7 +9,6 @@ import {
   Check,
   RotateCcw,
   Search,
-  MapPin,
   TrendingUp,
   Eye,
   Sliders,
@@ -52,7 +51,6 @@ export const LiveAuctionView: React.FC = () => {
     valid: boolean;
     error?: string;
     warning?: string;
-    villageCount?: number;
     teamRemaining?: number;
     maxSafeBid?: number;
   } | null>(null);
@@ -69,7 +67,6 @@ export const LiveAuctionView: React.FC = () => {
       id: 1,
       code: 'P001',
       name: 'READY FOR AUCTION',
-      village: 'General',
       role: 'All-Rounder',
       auctionOrder: 1,
       status: 'AVAILABLE',
@@ -86,13 +83,7 @@ export const LiveAuctionView: React.FC = () => {
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId) || teams[0];
 
-  // Compute village/zone count for selected team and current player
-  const teamSoldPlayers = players.filter((p) => p.soldToTeamId === selectedTeam?.id);
-  const teamVillageCount = teamSoldPlayers.filter(
-    (p) => p.village.toLowerCase() === currentPlayer?.village?.toLowerCase()
-  ).length;
-
-  const currentBid = bidding.currentBid || settings.defaultReservePrice || 1000;
+  const currentBid = bidding.currentBid || settings.defaultReservePrice || 500;
 
   // Quick bid increment handler
   const handleAddBid = (increment: number) => {
@@ -141,8 +132,7 @@ export const LiveAuctionView: React.FC = () => {
     const q = searchQuery.toLowerCase();
     return (
       p.name.toLowerCase().includes(q) ||
-      p.code.toLowerCase().includes(q) ||
-      p.village.toLowerCase().includes(q)
+      p.code.toLowerCase().includes(q)
     );
   });
 
@@ -230,7 +220,7 @@ export const LiveAuctionView: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, ID (P001), or zone..."
+                placeholder="Search by name or ID (P001)..."
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2 font-medium"
               />
               <div className="overflow-y-auto flex-1 divide-y divide-slate-100 space-y-1">
@@ -247,7 +237,7 @@ export const LiveAuctionView: React.FC = () => {
                       <span className="font-mono text-slate-400 font-bold mr-2">{p.code}</span>
                       <span className="font-['Outfit'] font-bold text-slate-900">{p.name}</span>
                       <span className="text-[10px] text-slate-500 block">
-                        {p.village} • {p.role}
+                        {p.role}
                       </span>
                     </div>
                     <span
@@ -308,10 +298,6 @@ export const LiveAuctionView: React.FC = () => {
                   >
                     {currentPlayer.role}
                   </span>
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>{currentPlayer.village}</span>
-                  </span>
                 </div>
               </div>
             </div>
@@ -347,25 +333,15 @@ export const LiveAuctionView: React.FC = () => {
             )}
           </div>
 
-          {/* Player Bio & Quota Footer */}
+          {/* Player Bio Footer */}
           <div className="p-4 bg-slate-50 border-t border-slate-100 text-xs text-slate-600 space-y-2">
             <div className="flex justify-between items-center">
               <span>Category / Role</span>
               <span className="font-bold text-slate-900">{currentPlayer.role}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span>Regional Zone</span>
-              <span className="font-bold text-slate-900">{currentPlayer.village}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>Selected Team Roster Count from this Zone</span>
-              <span
-                className={`font-mono font-bold ${
-                  teamVillageCount >= settings.maxVillageLimit ? 'text-amber-600' : 'text-slate-900'
-                }`}
-              >
-                {teamVillageCount} / {settings.maxVillageLimit}
-              </span>
+              <span>Auction Code</span>
+              <span className="font-mono font-bold text-slate-900">{currentPlayer.code}</span>
             </div>
           </div>
         </div>
@@ -444,7 +420,7 @@ export const LiveAuctionView: React.FC = () => {
                     Raise Bid By (+):
                   </label>
                   <div className="grid grid-cols-4 gap-2">
-                    {[1000, 2000, 5000, 10000].map((inc) => (
+                    {[500, 1000, 2000, 5000].map((inc) => (
                       <button
                         key={inc}
                         onClick={() => handleAddBid(inc)}
@@ -460,7 +436,7 @@ export const LiveAuctionView: React.FC = () => {
                 <form onSubmit={handleCustomBidSubmit} className="flex gap-2">
                   <input
                     type="number"
-                    step={settings.minBidIncrement || 1000}
+                    step={settings.minBidIncrement || 500}
                     value={customBidInput}
                     onChange={(e) => setCustomBidInput(e.target.value)}
                     placeholder="Enter custom bid points..."

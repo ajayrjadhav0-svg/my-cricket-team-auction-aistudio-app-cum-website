@@ -8,7 +8,6 @@ interface AddNewPlayerModalProps {
   onAddPlayer: (player: {
     name: string;
     role: PlayerRole;
-    village: string;
     loadDirectlyToAuction: boolean;
   }) => Promise<boolean>;
 }
@@ -22,7 +21,6 @@ export const AddNewPlayerModal: React.FC<AddNewPlayerModalProps> = ({
 
   const [name, setName] = useState('');
   const [role, setRole] = useState<PlayerRole>('All-Rounder');
-  const [village, setVillage] = useState('');
   const [loadDirectlyToAuction, setLoadDirectlyToAuction] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -34,12 +32,10 @@ export const AddNewPlayerModal: React.FC<AddNewPlayerModalProps> = ({
       const ok = await onAddPlayer({
         name: name.trim().toUpperCase(),
         role,
-        village: village.trim() || 'General',
         loadDirectlyToAuction,
       });
       if (ok) {
         setName('');
-        setVillage('');
         onClose();
       }
     } finally {
@@ -90,35 +86,20 @@ export const AddNewPlayerModal: React.FC<AddNewPlayerModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Playing Role
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as PlayerRole)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-medium text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="Batsman">Batsman</option>
-                <option value="Bowler">Bowler</option>
-                <option value="All-Rounder">All-Rounder</option>
-                <option value="Wicket-Keeper">Wicket-Keeper</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Zone / Village / City
-              </label>
-              <input
-                type="text"
-                value={village}
-                onChange={(e) => setVillage(e.target.value)}
-                placeholder="e.g. North Zone"
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Playing Role
+            </label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as PlayerRole)}
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-medium text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              <option value="Batsman">Batsman</option>
+              <option value="Bowler">Bowler</option>
+              <option value="All-Rounder">All-Rounder</option>
+              <option value="Wicket-Keeper">Wicket-Keeper</option>
+            </select>
           </div>
 
           <label className="flex items-center gap-2.5 p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 cursor-pointer">

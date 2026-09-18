@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   LayoutDashboard,
   Gavel,
@@ -7,15 +7,11 @@ import {
   Trophy,
   History,
   Settings,
-  Share2,
-  Check,
-  Eye,
   X,
   LogOut,
 } from 'lucide-react';
 import { ActiveNav } from '../types';
 import { useAuction } from '../context/AuctionContext';
-import { formatINR, formatPoints } from '../utils/formatters';
 
 interface SidebarProps {
   activeNav: ActiveNav;
@@ -30,9 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { state, role, logoutAdmin, getViewerShareUrl, showNotification } = useAuction();
-  const summary = state?.summary;
-  const [copiedLink, setCopiedLink] = useState(false);
+  const { state, role, logoutAdmin } = useAuction();
 
   // Public navigation items. Admin panel is removed from screen and hidden inside Settings.
   const navItems: { id: ActiveNav; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -46,14 +40,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const visibleNavItems = navItems;
-
-  const handleCopyViewerLink = () => {
-    const link = getViewerShareUrl();
-    navigator.clipboard.writeText(link);
-    setCopiedLink(true);
-    showNotification('success', 'Viewer share link copied to clipboard!');
-    setTimeout(() => setCopiedLink(false), 3000);
-  };
 
   return (
     <>
@@ -168,54 +154,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
-
-        {/* Share Viewer Link Card */}
-        <div className="p-3 mx-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide">
-              Live Spectators
-            </span>
-            <span className="text-[10px] font-bold text-slate-500">Real-time</span>
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Share link with viewers to watch live squads and bidding updates.
-          </p>
-          <button
-            onClick={handleCopyViewerLink}
-            className="w-full py-1.5 px-2.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-2xs transition-all"
-          >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
-            <span>{copiedLink ? 'Link Copied!' : 'Copy Viewer Link'}</span>
-          </button>
-        </div>
-
-        {/* Tournament Mini Metrics Footer */}
-        {summary && (
-          <div className="p-3.5 m-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Total Spent</span>
-              <span className="font-mono font-bold text-slate-900">
-                {formatPoints(summary.totalAuctionPointsSpent)} pts
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Committee Cash</span>
-              <span className="font-mono font-bold text-emerald-600">
-                {formatINR(summary.totalCommitteeCash)}
-              </span>
-            </div>
-            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-indigo-600 h-full rounded-full transition-all duration-500"
-                style={{ width: `${summary.auctionProgressPct}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>Progress</span>
-              <span className="font-bold text-slate-700">{summary.auctionProgressPct}%</span>
-            </div>
-          </div>
-        )}
       </aside>
     </>
   );

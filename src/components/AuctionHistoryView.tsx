@@ -24,25 +24,13 @@ export const AuctionHistoryView: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
-  const [villageFilter, setVillageFilter] = useState('ALL');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [rollbackPlayerId, setRollbackPlayerId] = useState<number | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
-  if (!state) {
-    return <div className="p-8 text-slate-400">Loading auction history log...</div>;
-  }
-
-  const { transactions, teams, settings } = state;
-
-  // Extract unique villages
-  const uniqueVillages = useMemo(() => {
-    const set = new Set<string>();
-    transactions.forEach((t) => {
-      if (t.village) set.add(t.village);
-    });
-    return Array.from(set).sort();
-  }, [transactions]);
+  const transactions = state?.transactions || [];
+  const teams = state?.teams || [];
+  const settings = state?.settings;
 
   // Filter & Sort Transactions
   const filteredTransactions = useMemo(() => {
@@ -50,13 +38,11 @@ export const AuctionHistoryView: React.FC = () => {
       const matchesSearch =
         t.playerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.playerId.toString().includes(searchTerm) ||
-        (t.village && t.village.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (t.teamName && t.teamName.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesTeam = teamFilter === 'ALL' || t.teamId === teamFilter;
-      const matchesVillage = villageFilter === 'ALL' || t.village === villageFilter;
 
-      return matchesSearch && matchesTeam && matchesVillage;
+      return matchesSearch && matchesTeam;
     });
 
     if (sortOrder === 'asc') {
@@ -64,7 +50,11 @@ export const AuctionHistoryView: React.FC = () => {
     }
 
     return result;
-  }, [transactions, searchTerm, teamFilter, villageFilter, sortOrder]);
+  }, [transactions, searchTerm, teamFilter, sortOrder]);
+
+  if (!state) {
+    return <div className="p-8 text-slate-400">Loading auction history log...</div>;
+  }
 
   const handleRollbackConfirm = async () => {
     if (!rollbackPlayerId) return;
@@ -87,7 +77,7 @@ export const AuctionHistoryView: React.FC = () => {
             <span>AUCTION TRANSACTION AUDIT LOG</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time chronological hammer ledger. Records price, franchise, village, and extra cash fees.
+            Real-time chronological hammer ledger. Records price, franchise, and extra cash fees.
           </p>
         </div>
 
@@ -112,7 +102,7 @@ export const AuctionHistoryView: React.FC = () => {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="p-4 rounded-2xl bg-white border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs shadow-2xs">
+      <div className="p-4 rounded-2xl bg-white border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs shadow-2xs">
         {/* Search */}
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -120,7 +110,7 @@ export const AuctionHistoryView: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by player, team, or village..."
+            placeholder="Search by player or team..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
           />
         </div>
@@ -136,22 +126,6 @@ export const AuctionHistoryView: React.FC = () => {
             {teams.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Village Filter */}
-        <div>
-          <select
-            value={villageFilter}
-            onChange={(e) => setVillageFilter(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-          >
-            <option value="ALL">All Villages ({uniqueVillages.length})</option>
-            {uniqueVillages.map((v) => (
-              <option key={v} value={v}>
-                {v}
               </option>
             ))}
           </select>
@@ -180,7 +154,6 @@ export const AuctionHistoryView: React.FC = () => {
                 <th className="py-3 px-4 font-bold">TIME</th>
                 <th className="py-3 px-4 font-bold">PLAYER</th>
                 <th className="py-3 px-3 font-bold">ROLE</th>
-                <th className="py-3 px-3 font-bold">VILLAGE</th>
                 <th className="py-3 px-4 font-bold">WINNING TEAM</th>
                 <th className="py-3 px-3 font-bold text-right">HAMMER PRICE</th>
                 <th className="py-3 px-3 font-bold text-right">PENALTY ₹</th>
@@ -192,7 +165,7 @@ export const AuctionHistoryView: React.FC = () => {
             <tbody className="divide-y divide-slate-100 font-medium">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={role === 'admin' ? 8 : 7} className="text-center py-12 text-slate-400">
+                  <td colSpan={role === 'admin' ? 7 : 6} className="text-center py-12 text-slate-400">
                     No auction transactions logged yet.
                   </td>
                 </tr>
@@ -222,8 +195,6 @@ export const AuctionHistoryView: React.FC = () => {
                           {tx.role}
                         </span>
                       </td>
-
-                      <td className="py-3 px-3 text-slate-700">{tx.village}</td>
 
                       <td className="py-3 px-4 font-semibold text-slate-900">
                         {tx.teamName}

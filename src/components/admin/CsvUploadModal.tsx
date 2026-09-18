@@ -31,7 +31,7 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
   };
 
   const handleDownloadSample = () => {
-    const sample = `Player Name,Role,Zone / Village\nVirat Kohli,Batsman,North Zone\nRohit Sharma,Batsman,West Zone\nJasprit Bumrah,Bowler,West Zone\nRavindra Jadeja,All-Rounder,West Zone\nMS Dhoni,Wicket-Keeper,East Zone\nKL Rahul,Wicket-Keeper,South Zone\nHardik Pandya,All-Rounder,West Zone\nMohammed Shami,Bowler,North Zone\nSuryakumar Yadav,Batsman,West Zone\nKuldeep Yadav,Bowler,Central Zone`;
+    const sample = `Player Name,Role\nVirat Kohli,Batsman\nRohit Sharma,Batsman\nJasprit Bumrah,Bowler\nRavindra Jadeja,All-Rounder\nMS Dhoni,Wicket-Keeper\nKL Rahul,Wicket-Keeper\nHardik Pandya,All-Rounder\nMohammed Shami,Bowler\nSuryakumar Yadav,Batsman\nKuldeep Yadav,Bowler`;
     const blob = new Blob([sample], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -105,7 +105,7 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
               <span className="font-bold text-xs text-slate-700">
                 Click to browse CSV file or drag here
               </span>
-              <span className="text-[11px] text-slate-400">Format: Name, Role, Zone</span>
+              <span className="text-[11px] text-slate-400">Format: Name, Role</span>
             </label>
           </div>
 
@@ -127,7 +127,7 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
             rows={5}
             value={csvContent}
             onChange={(e) => setCsvContent(e.target.value)}
-            placeholder="Virat Kohli,Batsman,North Zone&#10;Rohit Sharma,Batsman,West Zone&#10;Jasprit Bumrah,Bowler,West Zone"
+            placeholder="Virat Kohli,Batsman&#10;Rohit Sharma,Batsman&#10;Jasprit Bumrah,Bowler"
             className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
 

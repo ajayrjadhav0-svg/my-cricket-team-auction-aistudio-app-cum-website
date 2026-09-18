@@ -24,12 +24,6 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
 
   const squadPlayers = players.filter((p) => p.soldToTeamId === team.id);
 
-  // Village/Zone Breakdown
-  const zoneCounts: Record<string, number> = {};
-  squadPlayers.forEach((p) => {
-    zoneCounts[p.village] = (zoneCounts[p.village] || 0) + 1;
-  });
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[90vh]">
@@ -64,26 +58,6 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
           </button>
         </div>
 
-        {/* Zone Breakdown Chips */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2 flex-wrap text-xs">
-          <span className="font-bold text-slate-600 flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Zone Quota Distribution:</span>
-          </span>
-          {Object.keys(zoneCounts).length === 0 ? (
-            <span className="text-slate-400 italic">No players acquired yet.</span>
-          ) : (
-            Object.entries(zoneCounts).map(([zone, count]) => (
-              <span
-                key={zone}
-                className="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 font-medium text-slate-700"
-              >
-                {zone}: <strong className="font-mono">{count}</strong>
-              </span>
-            ))
-          )}
-        </div>
-
         {/* Squad Table */}
         <div className="p-4 overflow-y-auto flex-1">
           <table className="w-full text-left text-xs">
@@ -92,7 +66,6 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
                 <th className="py-2.5 px-3 font-bold">SLOT #</th>
                 <th className="py-2.5 px-3 font-bold">PLAYER</th>
                 <th className="py-2.5 px-2 font-bold">ROLE</th>
-                <th className="py-2.5 px-3 font-bold">VILLAGE</th>
                 <th className="py-2.5 px-3 font-bold text-right">POINTS</th>
                 {onReopenPlayer && <th className="py-2.5 px-2 text-center font-bold">ACTION</th>}
               </tr>
@@ -117,7 +90,6 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
                           {player.role}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-slate-600">{player.village}</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                         {formatPoints(player.soldPrice)} pts
                       </td>
@@ -142,7 +114,6 @@ export const TeamSquadModal: React.FC<TeamSquadModalProps> = ({
                     <td className="py-2.5 px-3 font-mono font-semibold">#{slot}</td>
                     <td className="py-2.5 px-3 italic text-slate-400">Unfilled Squad Slot</td>
                     <td className="py-2.5 px-2">—</td>
-                    <td className="py-2.5 px-3">—</td>
                     <td className="py-2.5 px-3 text-right font-mono text-slate-400">—</td>
                     {onReopenPlayer && <td className="py-2.5 px-2">—</td>}
                   </tr>

@@ -11,15 +11,15 @@ export function formatINR(val: number): string {
 export function getRoleBadgeStyle(role: string): { bg: string; text: string; border: string } {
   switch (role) {
     case 'All-Rounder':
-      return { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' };
+      return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
     case 'Batsman':
-      return { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' };
+      return { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200' };
     case 'Bowler':
-      return { bg: 'bg-sky-500/15', text: 'text-sky-400', border: 'border-sky-500/30' };
+      return { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' };
     case 'Wicket-Keeper':
-      return { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30' };
+      return { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' };
     default:
-      return { bg: 'bg-zinc-500/15', text: 'text-zinc-400', border: 'border-zinc-500/30' };
+      return { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' };
   }
 }
 

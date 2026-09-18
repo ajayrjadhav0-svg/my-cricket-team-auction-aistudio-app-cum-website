@@ -4,6 +4,7 @@ import { ActiveNav } from '../types';
 import { useAuction } from '../context/AuctionContext';
 import { formatINR } from '../utils/formatters';
 
+
 interface HeaderProps {
   activeNav: ActiveNav;
   onToggleSidebar: () => void;
@@ -18,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { state, refreshState, role, logoutAdmin, getViewerShareUrl, notification, clearNotification, showNotification } = useAuction();
   const summary = state?.summary;
   const [copiedLink, setCopiedLink] = useState(false);
+
 
   const navTitles: Record<ActiveNav, string> = {
     dashboard: 'AUCTION DASHBOARD',
@@ -101,6 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
           <span className="hidden md:inline">{copiedLink ? 'Copied' : 'Share Link'}</span>
         </button>
+
 
         {/* Committee Cash Tracker */}
         {summary && summary.totalCommitteeCash > 0 && (

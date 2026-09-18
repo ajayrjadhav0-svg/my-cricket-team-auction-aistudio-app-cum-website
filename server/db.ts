@@ -40,21 +40,12 @@ class AuctionDatabase {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (parsed && parsed.teams && parsed.players) {
-          // Automatic migration: strip icon allocations, remove zone limits & names
+          // Automatic migration: strip legacy fields and icon allocations
           let needsSave = false;
 
-          const villageMap: Record<string, string> = {
-            'West Zone': 'Rampur',
-            'North Zone': 'Sonapur',
-            'South Zone': 'Alibaug',
-            'East Zone': 'Bori',
-            'Central Zone': 'Chandrapur',
-            'Overseas': 'Belapur',
-          };
-
-          parsed.players.forEach((p: Player) => {
-            if (p.village && villageMap[p.village]) {
-              p.village = villageMap[p.village];
+          parsed.players.forEach((p: any) => {
+            if (p.village) {
+              delete p.village;
               needsSave = true;
             }
             if (p.isIcon || p.status === 'ICON') {
@@ -68,19 +59,41 @@ class AuctionDatabase {
             }
           });
 
-          // Remove pre-allocated icon transactions
+          // Remove pre-allocated icon transactions and strip legacy fields
           if (parsed.transactions) {
             const originalLength = parsed.transactions.length;
             parsed.transactions = parsed.transactions.filter((t: AuctionTransaction) => !t.isIcon && t.timestamp !== 'Pre-Auction Allocation');
+            parsed.transactions.forEach((t: any) => {
+              if (t.village) {
+                delete t.village;
+                needsSave = true;
+              }
+            });
             if (parsed.transactions.length !== originalLength) needsSave = true;
           }
 
           if (parsed.settings) {
-            parsed.settings.maxVillageLimit = 9999;
+            if (parsed.settings.maxVillageLimit !== undefined) {
+              delete parsed.settings.maxVillageLimit;
+              needsSave = true;
+            }
+            if (parsed.settings.allowVillageOverride !== undefined) {
+              delete parsed.settings.allowVillageOverride;
+              needsSave = true;
+            }
             parsed.settings.iconPlayersCount = 0;
             parsed.settings.iconCostPerPlayer = 0;
             parsed.settings.maxAuctionPlayers = parsed.settings.maxSquadSize || 15;
             parsed.settings.auctionBudget = parsed.settings.startingPoints || 100000;
+            if (parsed.settings.minBidIncrement !== 500 || parsed.settings.defaultReservePrice !== 500) {
+              parsed.settings.minBidIncrement = 500;
+              parsed.settings.defaultReservePrice = 500;
+              needsSave = true;
+            }
+            if (parsed.bidding && parsed.bidding.currentBid === 1000 && (!parsed.bidding.bidHistory || parsed.bidding.bidHistory.length === 0)) {
+              parsed.bidding.currentBid = 500;
+              needsSave = true;
+            }
           }
 
           if (needsSave) {
@@ -114,7 +127,7 @@ class AuctionDatabase {
 
     const bidding: LiveBiddingState = {
       currentPlayerId: livePlayer ? livePlayer.id : 1,
-      currentBid: DEFAULT_SETTINGS.defaultReservePrice || 1000,
+      currentBid: DEFAULT_SETTINGS.defaultReservePrice || 500,
       selectedTeamId: teams[0] ? teams[0].id : null,
       isActive: false,
       bidHistory: [],
@@ -140,7 +153,7 @@ class AuctionDatabase {
 
     const bidding: LiveBiddingState = {
       currentPlayerId: firstAvailable ? firstAvailable.id : 1,
-      currentBid: DEFAULT_SETTINGS.defaultReservePrice || 1000,
+      currentBid: DEFAULT_SETTINGS.defaultReservePrice || 500,
       selectedTeamId: teams[0] ? teams[0].id : null,
       isActive: true,
       bidHistory: [],
@@ -202,21 +215,13 @@ class AuctionDatabase {
     icons: Player[];
     auctionPlayers: Player[];
     total: Player[];
-    villageCounts: Record<string, number>;
   } {
     const squad = this.state.players.filter(p => p.soldToTeamId === teamId);
-
-    const villageCounts: Record<string, number> = {};
-    squad.forEach(p => {
-      const village = p.village || 'General';
-      villageCounts[village] = (villageCounts[village] || 0) + 1;
-    });
 
     return {
       icons: [],
       auctionPlayers: squad,
       total: squad,
-      villageCounts,
     };
   }
 
@@ -367,7 +372,6 @@ class AuctionDatabase {
     valid: boolean;
     error?: string;
     warning?: string;
-    villageCount?: number;
     teamRemaining?: number;
     maxSafeBid?: number;
   } {
@@ -393,9 +397,6 @@ class AuctionDatabase {
       return { valid: false, error: 'Winning bid must be greater than 0.' };
     }
 
-    const squadInfo = this.getTeamSquad(teamId);
-    const currentVillageCount = squadInfo.villageCounts[player.village] || 0;
-
     let warning: string | undefined;
     if (soldPrice > team.maxSafeBid && team.maxSafeBid > 0) {
       warning = `Bid (${soldPrice.toLocaleString()}) exceeds Safe Max Bid (${team.maxSafeBid.toLocaleString()}). Will trigger extra points cash penalty.`;
@@ -404,7 +405,6 @@ class AuctionDatabase {
     return {
       valid: true,
       warning,
-      villageCount: currentVillageCount,
       teamRemaining: team.pointsRemaining,
       maxSafeBid: team.maxSafeBid,
     };
@@ -441,7 +441,6 @@ class AuctionDatabase {
       auctionOrder: this.state.transactions.length + 1,
       playerId: player.id,
       playerName: player.name,
-      village: player.village,
       role: player.role,
       teamId: team.id,
       teamName: team.name,
@@ -455,7 +454,7 @@ class AuctionDatabase {
     const nextPlayer = this.state.players.find(p => p.status === 'AVAILABLE');
     if (nextPlayer) {
       this.state.bidding.currentPlayerId = nextPlayer.id;
-      this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 1000;
+      this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 500;
       this.state.bidding.bidHistory = [];
     }
 
@@ -478,7 +477,7 @@ class AuctionDatabase {
     const nextPlayer = this.state.players.find(p => p.status === 'AVAILABLE');
     if (nextPlayer) {
       this.state.bidding.currentPlayerId = nextPlayer.id;
-      this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 1000;
+      this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 500;
     }
 
     this.recalculateAllTeams();
@@ -498,7 +497,7 @@ class AuctionDatabase {
     this.state.transactions = this.state.transactions.filter(t => t.playerId !== playerId);
 
     this.state.bidding.currentPlayerId = playerId;
-    this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 1000;
+    this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 500;
 
     this.recalculateAllTeams();
     this.saveToDisk();
@@ -530,7 +529,7 @@ class AuctionDatabase {
     const player = this.getPlayer(playerId);
     if (player) {
       this.state.bidding.currentPlayerId = playerId;
-      this.state.bidding.currentBid = player.soldPrice > 0 ? player.soldPrice : (this.state.settings.defaultReservePrice || 1000);
+      this.state.bidding.currentBid = player.soldPrice > 0 ? player.soldPrice : (this.state.settings.defaultReservePrice || 500);
       this.state.bidding.bidHistory = [];
       this.saveToDisk();
     }
@@ -559,7 +558,6 @@ class AuctionDatabase {
       id: nextId,
       code: `P${nextId.toString().padStart(3, '0')}`,
       name: (newPlayerData.name || 'NEW PLAYER').trim().toUpperCase(),
-      village: newPlayerData.village || 'General',
       role: newPlayerData.role || 'All-Rounder',
       auctionOrder: this.state.players.length + 1,
       status: 'AVAILABLE',
@@ -579,7 +577,6 @@ class AuctionDatabase {
     if (!player) return { success: false, message: 'Player not found' };
 
     if (updates.name) player.name = updates.name.trim().toUpperCase();
-    if (updates.village) player.village = updates.village;
     if (updates.role) player.role = updates.role;
     if (typeof updates.auctionOrder === 'number') player.auctionOrder = updates.auctionOrder;
     if (updates.status) player.status = updates.status;
@@ -620,7 +617,7 @@ class AuctionDatabase {
       this.state.transactions = [];
       if (this.state.players[0]) {
         this.state.bidding.currentPlayerId = this.state.players[0].id;
-        this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 1000;
+        this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 500;
       }
       this.recalculateAllTeams();
       this.saveToDisk();
@@ -648,7 +645,7 @@ class AuctionDatabase {
       startIndex = 1;
     }
 
-    const newPlayers: Array<{ name: string; village: string; role: any; status?: string }> = [];
+    const newPlayers: Array<{ name: string; role: any; status?: string }> = [];
 
     for (let i = startIndex; i < lines.length; i++) {
       const line = lines[i];
@@ -657,17 +654,14 @@ class AuctionDatabase {
       if (!parts[0]) continue;
 
       const name = parts[0];
-      let village = 'General';
       let role = 'All-Rounder';
 
       if (parts[1]) {
         const p1 = parts[1];
         if (['batsman', 'bowler', 'all-rounder', 'wicket-keeper'].includes(p1.toLowerCase())) {
           role = p1;
-          if (parts[2]) village = parts[2];
-        } else {
-          village = p1;
-          if (parts[2]) role = parts[2];
+        } else if (parts[2] && ['batsman', 'bowler', 'all-rounder', 'wicket-keeper'].includes(parts[2].toLowerCase())) {
+          role = parts[2];
         }
       }
 
@@ -679,7 +673,7 @@ class AuctionDatabase {
       else if (rLower.includes('wick') || rLower.includes('wk')) standardRole = 'Wicket-Keeper';
       else standardRole = 'All-Rounder';
 
-      newPlayers.push({ name, village, role: standardRole });
+      newPlayers.push({ name, role: standardRole });
     }
 
     if (replaceExisting) {
@@ -691,7 +685,6 @@ class AuctionDatabase {
     newPlayers.forEach(p => {
       this.addPlayer({
         name: p.name,
-        village: p.village,
         role: p.role,
       });
       count++;
@@ -699,7 +692,7 @@ class AuctionDatabase {
 
     if (this.state.players[0]) {
       this.state.bidding.currentPlayerId = this.state.players[0].id;
-      this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 1000;
+      this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 500;
     }
 
     this.recalculateAllTeams();
@@ -707,13 +700,12 @@ class AuctionDatabase {
     return { count, message: `Successfully imported ${count} players.` };
   }
 
-  public importPlayers(list: Array<{ id?: number; name: string; village?: string; role?: string }>): { count: number } {
+  public importPlayers(list: Array<{ id?: number; name: string; role?: string }>): { count: number } {
     let count = 0;
     list.forEach(item => {
       if (item.name) {
         this.addPlayer({
           name: item.name,
-          village: item.village || 'General',
           role: (item.role as any) || 'All-Rounder',
         });
         count++;

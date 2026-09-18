@@ -69,7 +69,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
   // Fast Sell Console State
   const [sellPlayerIdInput, setSellPlayerIdInput] = useState<string>('');
   const [selectedSellTeamId, setSelectedSellTeamId] = useState<string>('');
-  const [sellAmountInput, setSellAmountInput] = useState<number>(1000);
+  const [sellAmountInput, setSellAmountInput] = useState<number>(500);
 
   // Modals state
   const [isConfirmSaleOpen, setIsConfirmSaleOpen] = useState(false);
@@ -89,7 +89,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
   useEffect(() => {
     if (state?.bidding?.currentPlayerId) {
       setSellPlayerIdInput(String(state.bidding.currentPlayerId));
-      setSellAmountInput(state.bidding.currentBid || 1000);
+      setSellAmountInput(state.bidding.currentBid || 500);
     }
   }, [state?.bidding?.currentPlayerId]);
 
@@ -100,73 +100,76 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
     }
   }, [state?.teams, selectedSellTeamId]);
 
-  if (!state) return null;
+  const players = state?.players || [];
+  const teams = state?.teams || [];
 
   // Resolve currently auctioned player
-  const currentStagePlayer = state.players.find((p) => p.id === state.bidding.currentPlayerId);
+  const currentStagePlayer = state?.bidding?.currentPlayerId
+    ? players.find((p) => p.id === state.bidding.currentPlayerId)
+    : undefined;
 
   // Resolve player to be sold (based on sellPlayerIdInput)
   const resolvedSellPlayer = useMemo(() => {
     if (!sellPlayerIdInput.trim()) return currentStagePlayer || null;
     const clean = sellPlayerIdInput.trim().toUpperCase();
     // match by exact id or code or name prefix
-    const byId = state.players.find((p) => String(p.id) === clean);
+    const byId = players.find((p) => String(p.id) === clean);
     if (byId) return byId;
-    const byCode = state.players.find((p) => p.code.toUpperCase() === clean);
+    const byCode = players.find((p) => p.code.toUpperCase() === clean);
     if (byCode) return byCode;
-    const byName = state.players.find((p) => p.name.toUpperCase().includes(clean));
+    const byName = players.find((p) => p.name.toUpperCase().includes(clean));
     return byName || currentStagePlayer || null;
-  }, [sellPlayerIdInput, state.players, currentStagePlayer]);
+  }, [sellPlayerIdInput, players, currentStagePlayer]);
 
   // Resolve player preview for "Enter Player into Auction"
   const resolvedEnterPlayer = useMemo(() => {
     if (!enterPlayerInput.trim()) return null;
     const clean = enterPlayerInput.trim().toUpperCase();
-    const byId = state.players.find((p) => String(p.id) === clean);
+    const byId = players.find((p) => String(p.id) === clean);
     if (byId) return byId;
-    const byCode = state.players.find((p) => p.code.toUpperCase() === clean);
+    const byCode = players.find((p) => p.code.toUpperCase() === clean);
     if (byCode) return byCode;
-    const byName = state.players.find((p) => p.name.toUpperCase().includes(clean));
+    const byName = players.find((p) => p.name.toUpperCase().includes(clean));
     return byName || null;
-  }, [enterPlayerInput, state.players]);
+  }, [enterPlayerInput, players]);
 
   // Resolve selected team to sell to
   const resolvedSellTeam = useMemo(() => {
-    return state.teams.find((t) => t.id === selectedSellTeamId) || state.teams[0] || null;
-  }, [selectedSellTeamId, state.teams]);
+    return teams.find((t) => t.id === selectedSellTeamId) || teams[0] || null;
+  }, [selectedSellTeamId, teams]);
 
   // Filtered Available Players
   const availablePlayers = useMemo(() => {
-    return state.players.filter((p) => {
+    return players.filter((p) => {
       if (p.status !== 'AVAILABLE') return false;
       if (availableRoleFilter !== 'ALL' && p.role !== availableRoleFilter) return false;
       if (availableSearch.trim()) {
         const query = availableSearch.toLowerCase();
         return (
           p.name.toLowerCase().includes(query) ||
-          p.code.toLowerCase().includes(query) ||
-          p.village.toLowerCase().includes(query)
+          p.code.toLowerCase().includes(query)
         );
       }
       return true;
     });
-  }, [state.players, availableSearch, availableRoleFilter]);
+  }, [players, availableSearch, availableRoleFilter]);
 
   // Unsold Players
   const unsoldPlayers = useMemo(() => {
-    return state.players.filter((p) => {
+    return players.filter((p) => {
       if (p.status !== 'UNSOLD') return false;
       if (unsoldSearch.trim()) {
         const query = unsoldSearch.toLowerCase();
         return (
           p.name.toLowerCase().includes(query) ||
-          p.code.toLowerCase().includes(query) ||
-          p.village.toLowerCase().includes(query)
+          p.code.toLowerCase().includes(query)
         );
       }
       return true;
     });
-  }, [state.players, unsoldSearch]);
+  }, [players, unsoldSearch]);
+
+  if (!state) return null;
 
   // Handlers
   const handleCopyViewerLink = () => {
@@ -186,7 +189,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
     const success = await selectAuctionPlayer(target.id);
     if (success) {
       setSellPlayerIdInput(String(target.id));
-      setSellAmountInput(target.soldPrice > 0 ? target.soldPrice : state.settings.defaultReservePrice || 1000);
+      setSellAmountInput(target.soldPrice > 0 ? target.soldPrice : state.settings.defaultReservePrice || 500);
       setEnterPlayerInput('');
       showNotification('success', `Now on Auction Block: ${target.name} (${target.code})`);
     }
@@ -570,9 +573,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
                   <span className="px-2 py-0.5 rounded bg-white font-medium border border-indigo-100">
                     {resolvedEnterPlayer.role}
                   </span>
-                  <span>Zone: {resolvedEnterPlayer.village}</span>
                   <span className="font-mono font-bold text-indigo-700 ml-auto">
-                    Base: {formatPoints(state.settings.defaultReservePrice || 1000)} pts
+                    Base: {formatPoints(state.settings.defaultReservePrice || 500)} pts
                   </span>
                 </div>
               </div>
@@ -599,7 +601,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
                   <span className="px-2 py-0.5 rounded bg-white font-medium border border-slate-200">
                     {currentStagePlayer.role}
                   </span>
-                  <span>Zone: {currentStagePlayer.village}</span>
                 </div>
               </div>
             ) : (
@@ -724,11 +725,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
                 <input
                   id="input-sell-amount"
                   type="number"
-                  step={state.settings.minBidIncrement || 1000}
+                  step={state.settings.minBidIncrement || 500}
                   value={sellAmountInput}
                   onChange={(e) => setSellAmountInput(Math.max(0, Number(e.target.value)))}
                   className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-300 text-slate-900 font-mono font-black text-lg focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
+                <button
+                  type="button"
+                  onClick={() => setSellAmountInput((prev) => prev + 500)}
+                  className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold font-mono transition-colors"
+                >
+                  +500
+                </button>
                 <button
                   type="button"
                   onClick={() => setSellAmountInput((prev) => prev + 1000)}
@@ -1036,7 +1044,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
                         >
                           {player.role}
                         </span>
-                        <span>{player.village}</span>
                       </div>
                     </div>
 
@@ -1055,7 +1062,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
                       <button
                         onClick={() => {
                           setSellPlayerIdInput(String(player.id));
-                          setSellAmountInput(state.settings.defaultReservePrice || 1000);
+                          setSellAmountInput(state.settings.defaultReservePrice || 500);
                           showNotification('info', `Selected ${player.name} for sell console.`);
                         }}
                         title="Auto-fill in Fast Sell Console"
@@ -1102,7 +1109,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
                     <h5 className="font-['Outfit'] font-bold text-slate-900 truncate">
                       {player.name}
                     </h5>
-                    <span className="text-[10px] text-slate-500">{player.role} • {player.village}</span>
+                    <span className="text-[10px] text-slate-500">{player.role}</span>
                   </div>
 
                   <button
@@ -1196,14 +1203,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
       <AddNewPlayerModal
         isOpen={isAddNewPlayerOpen}
         onClose={() => setIsAddNewPlayerOpen(false)}
-        onAddPlayer={async ({ name, role, village, loadDirectlyToAuction }) => {
+        onAddPlayer={async ({ name, role, loadDirectlyToAuction }) => {
           const res = await state;
           // We can use fetch or helper
           try {
             const resp = await fetch('/api/players', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name, role, village }),
+              body: JSON.stringify({ name, role }),
             });
             const data = await resp.json();
             if (data.success && data.player) {

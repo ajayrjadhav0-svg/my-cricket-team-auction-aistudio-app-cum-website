@@ -22,7 +22,6 @@ interface AuctionContextType {
     valid: boolean;
     error?: string;
     warning?: string;
-    villageCount?: number;
     teamRemaining?: number;
     maxSafeBid?: number;
   }>;

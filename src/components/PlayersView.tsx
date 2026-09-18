@@ -43,7 +43,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
   // Filters state
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
-  const [villageFilter, setVillageFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Modals state
@@ -54,45 +53,34 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
 
   // Form states for Add / Edit
   const [formName, setFormName] = useState('');
-  const [formVillage, setFormVillage] = useState('Village 1');
   const [formRole, setFormRole] = useState<PlayerRole>('All-Rounder');
   const [formOrder, setFormOrder] = useState<number>(1);
 
-  if (!state) {
-    return <div className="p-8 text-slate-400">Loading players database...</div>;
-  }
-
-  const { players, teams, settings } = state;
-
-  // Extract unique villages/zones for filter dropdown
-  const uniqueVillages = useMemo(() => {
-    const set = new Set<string>();
-    players.forEach((p) => {
-      if (p.village) set.add(p.village);
-    });
-    return Array.from(set).sort();
-  }, [players]);
+  const players = state?.players || [];
+  const teams = state?.teams || [];
+  const settings = state?.settings;
 
   // Filtered Players
   const filteredPlayers = useMemo(() => {
     return players.filter((p) => {
       const matchesSearch =
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.village && p.village.toLowerCase().includes(searchTerm.toLowerCase()));
+        p.code.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesRole = roleFilter === 'ALL' || p.role === roleFilter;
-      const matchesVillage = villageFilter === 'ALL' || p.village === villageFilter;
       const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
 
-      return matchesSearch && matchesRole && matchesVillage && matchesStatus;
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [players, searchTerm, roleFilter, villageFilter, statusFilter]);
+  }, [players, searchTerm, roleFilter, statusFilter]);
+
+  if (!state || !settings) {
+    return <div className="p-8 text-slate-400">Loading players database...</div>;
+  }
 
   // Open Add Modal
   const handleOpenAddModal = () => {
     setFormName('');
-    setFormVillage(uniqueVillages[0] || 'Zone 1');
     setFormRole('All-Rounder');
     setFormOrder(players.length + 1);
     setIsAddModalOpen(true);
@@ -104,7 +92,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
     if (!formName.trim()) return;
     const ok = await addPlayer({
       name: formName.trim().toUpperCase(),
-      village: formVillage,
       role: formRole,
       auctionOrder: Number(formOrder),
     });
@@ -115,7 +102,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
   const handleOpenEditModal = (player: Player) => {
     setEditingPlayer(player);
     setFormName(player.name);
-    setFormVillage(player.village);
     setFormRole(player.role);
     setFormOrder(player.auctionOrder);
   };
@@ -126,7 +112,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
     if (!editingPlayer) return;
     const ok = await updatePlayer(editingPlayer.id, {
       name: formName.trim().toUpperCase(),
-      village: formVillage,
       role: formRole,
       auctionOrder: Number(formOrder),
     });
@@ -150,7 +135,7 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
             <span>PLAYER DATABASE ({players.length} TOTAL)</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Registered roster for {settings.tournamentName}. Filter by role, village, or status.
+            Registered roster for {settings.tournamentName}. Filter by role or status.
           </p>
         </div>
 
@@ -192,7 +177,7 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
       />
 
       {/* Filter Controls Bar */}
-      <div className="p-4 rounded-2xl bg-white border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs shadow-2xs">
+      <div className="p-4 rounded-2xl bg-white border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs shadow-2xs">
         {/* Search */}
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -200,7 +185,7 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name, ID, village..."
+            placeholder="Search by name or ID..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
           />
         </div>
@@ -216,20 +201,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
           <option value="Bowler">Bowler</option>
           <option value="All-Rounder">All-Rounder</option>
           <option value="Wicketkeeper">Wicketkeeper</option>
-        </select>
-
-        {/* Village Filter */}
-        <select
-          value={villageFilter}
-          onChange={(e) => setVillageFilter(e.target.value)}
-          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-        >
-          <option value="ALL">All Villages ({uniqueVillages.length})</option>
-          {uniqueVillages.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
         </select>
 
         {/* Status Filter */}
@@ -255,7 +226,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
                 <th className="py-3.5 px-4 font-bold">CODE</th>
                 <th className="py-3.5 px-4 font-bold">NAME</th>
                 <th className="py-3.5 px-3 font-bold">ROLE</th>
-                <th className="py-3.5 px-3 font-bold">VILLAGE</th>
                 <th className="py-3.5 px-3 font-bold text-center">STATUS</th>
                 <th className="py-3.5 px-3 font-bold">TEAM</th>
                 <th className="py-3.5 px-4 font-bold text-right">SOLD PRICE</th>
@@ -267,7 +237,7 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
             <tbody className="divide-y divide-slate-100 font-medium">
               {filteredPlayers.length === 0 ? (
                 <tr>
-                  <td colSpan={role === 'admin' ? 9 : 8} className="text-center py-12 text-slate-400">
+                  <td colSpan={role === 'admin' ? 8 : 7} className="text-center py-12 text-slate-400">
                     No players found matching current filter query.
                   </td>
                 </tr>
@@ -300,8 +270,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
                           {player.role}
                         </span>
                       </td>
-
-                      <td className="py-3 px-3 text-slate-700">{player.village}</td>
 
                       <td className="py-3 px-3 text-center">
                         <span
@@ -408,18 +376,6 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. VIRAT SHARMA"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Zone / Village</label>
-                <input
-                  type="text"
-                  required
-                  value={formVillage}
-                  onChange={(e) => setFormVillage(e.target.value)}
-                  placeholder="e.g. North Zone / Village Name"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
