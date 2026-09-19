@@ -12,6 +12,7 @@ import { AuctionHistoryView } from './components/AuctionHistoryView';
 import { SettingsView } from './components/SettingsView';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminAccessGate } from './components/admin/AdminAccessGate';
+import { PlayerRegistrationView } from './components/PlayerRegistrationView';
 import {
   LayoutDashboard,
   Gavel,
@@ -20,11 +21,26 @@ import {
   Trophy,
   History,
   Settings,
+  UserPlus,
 } from 'lucide-react';
 
 function AuctionAppContent() {
   const { state, role } = useAuction();
-  const [activeNav, setActiveNav] = useState<ActiveNav>('dashboard');
+  const [activeNav, setActiveNav] = useState<ActiveNav>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get('view');
+      if (view === 'register') return 'register';
+      if (view === 'admin') return 'admin';
+      if (view === 'live-auction') return 'live-auction';
+      if (view === 'players') return 'players';
+      if (view === 'teams') return 'teams';
+      if (view === 'team-squads') return 'team-squads';
+    } catch {
+      // Fallback
+    }
+    return 'dashboard';
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedSquadTeamId, setSelectedSquadTeamId] = useState<string>('');
 
@@ -68,6 +84,10 @@ function AuctionAppContent() {
           )}
 
           {activeNav === 'live-auction' && <LiveAuctionView />}
+
+          {activeNav === 'register' && (
+            <PlayerRegistrationView onBackToApp={() => setActiveNav('dashboard')} />
+          )}
 
           {activeNav === 'admin' && (
             role === 'admin' ? (

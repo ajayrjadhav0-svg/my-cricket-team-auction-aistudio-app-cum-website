@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Menu, Gavel, RefreshCw, Shield, Share2, Check, Eye } from 'lucide-react';
+import { Menu, Gavel, RefreshCw, Shield, Share2, Check, Eye, Settings, FileCode, Download } from 'lucide-react';
 import { ActiveNav } from '../types';
 import { useAuction } from '../context/AuctionContext';
 import { formatINR } from '../utils/formatters';
-
+import { AdminLoginModal } from './admin/AdminLoginModal';
+import { generateClientStandaloneHTML } from '../utils/generateHTMLReport';
 
 interface HeaderProps {
   activeNav: ActiveNav;
@@ -19,11 +20,13 @@ export const Header: React.FC<HeaderProps> = ({
   const { state, refreshState, role, logoutAdmin, getViewerShareUrl, notification, clearNotification, showNotification } = useAuction();
   const summary = state?.summary;
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
 
   const navTitles: Record<ActiveNav, string> = {
     dashboard: 'AUCTION DASHBOARD',
     'live-auction': 'LIVE AUCTION COMMAND DESK',
+    register: 'PLAYER SELF-REGISTRATION PORTAL',
     players: 'PLAYER MANAGEMENT ROSTER',
     teams: 'FRANCHISE TEAMS & PURSE',
     'team-squads': 'TEAM SQUADS & ROSTERS',
@@ -38,6 +41,28 @@ export const Header: React.FC<HeaderProps> = ({
     setCopiedLink(true);
     showNotification('success', 'Viewer share link copied to clipboard!');
     setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  const handleDownloadHtmlFile = () => {
+    try {
+      if (state) {
+        const html = generateClientStandaloneHTML(state);
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'myauctionkpl.html');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showNotification('success', 'Downloaded myauctionkpl.html standalone offline report!');
+        return;
+      }
+    } catch (e) {
+      console.warn('Fallback to server HTML export', e);
+    }
+    window.location.href = '/api/export/myauctionkpl.html';
   };
 
   return (
@@ -125,6 +150,18 @@ export const Header: React.FC<HeaderProps> = ({
           <RefreshCw className="w-4 h-4 text-emerald-600" />
         </button>
 
+        {/* Download Standalone HTML File Button */}
+        <button
+          id="btn-header-html-report"
+          onClick={handleDownloadHtmlFile}
+          title="Download Complete Standalone HTML Report (myauctionkpl.html)"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-['Outfit'] font-bold text-xs shadow-2xs active:scale-95 transition-all"
+        >
+          <FileCode className="w-3.5 h-3.5 text-indigo-600" />
+          <span className="hidden sm:inline">HTML Report</span>
+          <Download className="w-3 h-3 text-indigo-500 hidden md:inline" />
+        </button>
+
         {/* Live Auction Quick Jump */}
         {activeNav !== 'live-auction' && (
           <button
@@ -136,7 +173,37 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">LIVE AUCTION</span>
           </button>
         )}
+
+        {/* Top-Right Settings / Admin Portal */}
+        <button
+          id="btn-header-admin-portal"
+          onClick={() => {
+            if (role === 'admin') {
+              onSelectNav('admin');
+            } else {
+              setIsLoginModalOpen(true);
+            }
+          }}
+          title={role === 'admin' ? 'Admin Panel Controls' : 'Settings & Admin Login'}
+          className={`p-2 rounded-xl border flex items-center gap-1.5 transition-all ${
+            role === 'admin'
+              ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-2xs'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span className="text-xs font-bold font-['Outfit'] hidden lg:inline">
+            {role === 'admin' ? 'Admin Panel' : 'Settings'}
+          </span>
+        </button>
       </div>
+
+      {/* Admin Login Modal */}
+      <AdminLoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSuccess={() => onSelectNav('admin')}
+      />
 
       {/* Notification Banner Overlay */}
       {notification && (

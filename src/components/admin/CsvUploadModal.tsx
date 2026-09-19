@@ -31,12 +31,12 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
   };
 
   const handleDownloadSample = () => {
-    const sample = `Player Name,Role\nVirat Kohli,Batsman\nRohit Sharma,Batsman\nJasprit Bumrah,Bowler\nRavindra Jadeja,All-Rounder\nMS Dhoni,Wicket-Keeper\nKL Rahul,Wicket-Keeper\nHardik Pandya,All-Rounder\nMohammed Shami,Bowler\nSuryakumar Yadav,Batsman\nKuldeep Yadav,Bowler`;
+    const sample = `ID,NAME,ROLE,VILLAGE\n1,ROHIT SHARMA,Batsman,Mumbai\n2,JASPRIT BUMRAH,Bowler,Ahmedabad\n3,RISHABH PANT,Wicket-Keeper,Roorkee\n4,RAVINDRA JADEJA,All-Rounder,Jamnagar\n5,MS DHONI,Wicket-Keeper,Ranchi\n6,VIRAT KOHLI,Batsman,Delhi\n7,HARDIK PANDYA,All-Rounder,Baroda\n8,MOHAMMED SHAMI,Bowler,Amroha`;
     const blob = new Blob([sample], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'sample_cricket_players.csv';
+    a.download = 'players_id_name_role_village.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -105,13 +105,15 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
               <span className="font-bold text-xs text-slate-700">
                 Click to browse CSV file or drag here
               </span>
-              <span className="text-[11px] text-slate-400">Format: Name, Role</span>
+              <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                Required Columns: ID, NAME, ROLE, VILLAGE
+              </span>
             </label>
           </div>
 
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Or Paste CSV Data Directly
+              Or Paste CSV Data Directly (ID, NAME, ROLE, VILLAGE)
             </label>
             <button
               type="button"
@@ -127,7 +129,7 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
             rows={5}
             value={csvContent}
             onChange={(e) => setCsvContent(e.target.value)}
-            placeholder="Virat Kohli,Batsman&#10;Rohit Sharma,Batsman&#10;Jasprit Bumrah,Bowler"
+            placeholder="ID,NAME,ROLE,VILLAGE&#10;1,ROHIT SHARMA,Batsman,Mumbai&#10;2,JASPRIT BUMRAH,Bowler,Ahmedabad&#10;3,RISHABH PANT,Wicket-Keeper,Roorkee"
             className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
 

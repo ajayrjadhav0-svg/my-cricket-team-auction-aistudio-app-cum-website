@@ -55,6 +55,15 @@ export const LiveAuctionView: React.FC = () => {
     maxSafeBid?: number;
   } | null>(null);
 
+  // If no team is selected yet, default to the first team or bidding.selectedTeamId
+  useEffect(() => {
+    if (!state) return;
+    const teams = state.teams || [];
+    if (!selectedTeamId && teams.length > 0) {
+      setSelectedTeamId(state.bidding?.selectedTeamId || teams[0].id);
+    }
+  }, [state?.teams, state?.bidding?.selectedTeamId, selectedTeamId]);
+
   if (!state) {
     return <div className="p-8 text-slate-400">Loading live auction console...</div>;
   }
@@ -73,13 +82,6 @@ export const LiveAuctionView: React.FC = () => {
       soldToTeamId: null,
       soldPrice: 0,
     };
-
-  // If no team is selected yet, default to the first team or bidding.selectedTeamId
-  useEffect(() => {
-    if (!selectedTeamId && teams.length > 0) {
-      setSelectedTeamId(bidding.selectedTeamId || teams[0].id);
-    }
-  }, [teams, bidding.selectedTeamId, selectedTeamId]);
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId) || teams[0];
 

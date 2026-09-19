@@ -1,22 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Users,
-  CheckCircle,
-  Clock,
-  Coins,
-  IndianRupee,
-  TrendingUp,
   Gavel,
   Shield,
+  Clock,
   ArrowRight,
-  Trophy,
-  UserCheck,
+  TrendingUp,
+  User,
+  Users,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
   Search,
+  ExternalLink,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
-import { formatINR, formatPoints, getTeamStatusBadge, getRoleBadgeStyle } from '../utils/formatters';
-import { ActiveNav, Team } from '../types';
+import { formatINR, formatPoints, formatTransactionTime, getRoleBadgeStyle, getTeamStatusBadge } from '../utils/formatters';
+import { ActiveNav, Player, Team } from '../types';
 
 interface DashboardViewProps {
   onNavigate: (nav: ActiveNav) => void;
@@ -29,448 +30,818 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const { state, role } = useAuction();
 
-  const [soldSearch, setSoldSearch] = useState('');
+  // State for Player Status Tabs
+  const [activeTab, setActiveTab] = useState<'sold' | 'unsold' | 'pool'>('sold');
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
 
-  const players = state?.players || [];
-  const teams = state?.teams || [];
+  // Memoized player classifications
+  const { soldPlayers, unsoldPlayers, poolPlayers } = useMemo(() => {
+    if (!state) return { soldPlayers: [], unsoldPlayers: [], poolPlayers: [] };
 
-  // Memoized sold players
-  const soldPlayers = useMemo(() => {
-    return players
-      .filter((p) => p.status === 'SOLD' || Boolean(p.soldToTeamId))
-      .sort((a, b) => (b.soldPrice || 0) - (a.soldPrice || 0));
-  }, [players]);
+    const sold = state.players.filter((p) => p.status === 'SOLD');
+    const unsold = state.players.filter((p) => p.status === 'UNSOLD');
+    const pool = state.players.filter((p) => p.status === 'AVAILABLE');
 
-  const filteredSoldPlayers = useMemo(() => {
-    if (!soldSearch.trim()) return soldPlayers;
-    const query = soldSearch.toLowerCase();
-    return soldPlayers.filter((p) => {
-      const team = teams.find((t) => t.id === p.soldToTeamId);
-      return (
+    return { soldPlayers: sold, unsoldPlayers: unsold, poolPlayers: pool };
+  }, [state?.players]);
+
+  // Filtered players based on active tab & search
+  const filteredTabPlayers = useMemo(() => {
+    let list: Player[] = [];
+    if (activeTab === 'sold') list = soldPlayers;
+    else if (activeTab === 'unsold') list = unsoldPlayers;
+    else list = poolPlayers;
+
+    if (!playerSearchQuery.trim()) return list;
+
+    const query = playerSearchQuery.toLowerCase();
+    return list.filter(
+      (p) =>
         p.name.toLowerCase().includes(query) ||
         p.code.toLowerCase().includes(query) ||
-        p.role.toLowerCase().includes(query) ||
-        (team && team.name.toLowerCase().includes(query)) ||
-        (team && team.shortCode.toLowerCase().includes(query))
-      );
-    });
-  }, [soldPlayers, soldSearch, teams]);
+        p.role.toLowerCase().includes(query)
+    );
+  }, [activeTab, soldPlayers, unsoldPlayers, poolPlayers, playerSearchQuery]);
+
+  // Memoized, resilient transaction list ensuring newest-first ordering and auto-backfill for sold players
+  const effectiveTransactions = useMemo(() => {
+    if (!state) return [];
+    const list = [...(state.transactions || [])];
+
+    // If transactions are present, ensure newest transactions are first
+    if (list.length > 0) {
+      return list.sort((a, b) => {
+        if (b.auctionOrder !== undefined && a.auctionOrder !== undefined && b.auctionOrder !== a.auctionOrder) {
+          return b.auctionOrder - a.auctionOrder;
+        }
+        // Fallback by transaction ID timestamp (e.g., tx-1789812901713-60)
+        const timeA = parseInt(a.id.split('-')[1] || '0', 10);
+        const timeB = parseInt(b.id.split('-')[1] || '0', 10);
+        if (timeA && timeB && timeA !== timeB) return timeB - timeA;
+        return 0;
+      });
+    }
+
+    // Resilient fallback: if transactions array is empty but there are sold players in roster, synthesize them
+    if (state.players) {
+      const sold = state.players.filter((p) => p.status === 'SOLD');
+      return sold.map((p, idx) => {
+        const team = state.teams.find((t) => t.id === p.soldToTeamId);
+        return {
+          id: `synth-${p.id}`,
+          timestamp: p.soldAt || 'Recent',
+          auctionOrder: p.auctionOrder || idx + 1,
+          playerId: p.id,
+          playerName: p.name,
+          role: p.role,
+          teamId: p.soldToTeamId || '',
+          teamName: team?.name || 'Franchise Team',
+          soldPrice: p.soldPrice || 0,
+          committeeCharge: 0,
+        };
+      }).reverse();
+    }
+
+    return [];
+  }, [state?.transactions, state?.players, state?.teams]);
 
   if (!state) {
     return (
-      <div className="flex items-center justify-center p-12 text-slate-400">
+      <div className="flex items-center justify-center p-12 text-slate-400 font-medium">
         Loading Cricket League Auction Dashboard...
       </div>
     );
   }
 
-  const { summary, bidding, settings } = state;
-  const currentPlayer = players.find((p) => p.id === bidding.currentPlayerId) || players[0];
+  const { summary, teams, bidding, players, settings, transactions } = state;
+
+  // Active Player on the Hammer
+  const currentPlayer =
+    players.find((p) => p.id === bidding.currentPlayerId) || players[0] || null;
+
+  // Leading Bidding Team
+  const leadingTeam = teams.find((t) => t.id === bidding.selectedTeamId);
+  const currentBidAmount = bidding.currentBid || (currentPlayer?.soldPrice > 0 ? currentPlayer.soldPrice : (settings.defaultReservePrice || 500));
+
+  // Recent transactions for Auction History feed (last 10)
+  const recentTransactions = effectiveTransactions.slice(0, 10);
 
   return (
-    <div className="space-y-6 pb-12 max-w-7xl mx-auto">
-      {/* Live Auction Stage Banner */}
-      <div className="p-4 md:p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black text-xl shadow-xs">
-            <Gavel className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold uppercase tracking-wider">
-                CURRENT PLAYER ON HAMMER
+    <div className="space-y-8 pb-16 max-w-7xl mx-auto">
+      {/* ========================================================================= */}
+      {/* 1. REAL-TIME AUCTION HUB (ACTIVE AUCTION | TEAMS SUMMARY | AUCTION FEED)  */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
+        {/* ACTIVE AUCTION BOX (Left Column - 4 cols on XL) */}
+        <div className="xl:col-span-4 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+          {/* Top Status Header */}
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
               </span>
-              <span className="text-xs text-slate-500 font-mono">
+              <span className="font-['Outfit'] font-black tracking-widest text-xs text-rose-400 uppercase">
+                ACTIVE AUCTION • UNDER THE HAMMER
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-full bg-white/10 text-white text-[11px] font-mono font-bold">
                 Order #{currentPlayer?.auctionOrder || 1}
               </span>
-            </div>
-            <h3 className="font-['Outfit'] font-extrabold text-lg md:text-xl text-slate-900 mt-0.5">
-              {currentPlayer ? `${currentPlayer.code} • ${currentPlayer.name}` : 'Auction Inactive'}
-            </h3>
-            <p className="text-xs text-slate-600">
-              {currentPlayer?.role}
-              {currentPlayer?.soldToTeamId && (
-                <span className="ml-2 text-emerald-600 font-medium">
-                  (Currently {currentPlayer.status})
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => onNavigate('live-auction')}
-          id="btn-dash-jump-auction"
-          className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all"
-        >
-          <span>OPEN LIVE AUCTION DESK</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* 6 SUMMARY METRIC CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-        {/* Total Players */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Players</span>
-            <Users className="w-4 h-4 text-indigo-600" />
-          </div>
-          <div>
-            <span className="font-['Outfit'] font-extrabold text-2xl md:text-3xl text-slate-900">
-              {summary.totalPlayers}
-            </span>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {settings.maxSquadSize} per team × {teams.length} teams
-            </p>
-          </div>
-        </div>
-
-        {/* Players Sold */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Players Sold</span>
-            <CheckCircle className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div>
-            <span className="font-['Outfit'] font-extrabold text-2xl md:text-3xl text-emerald-600">
-              {summary.playersSold}
-            </span>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Auctioned to teams
-            </p>
-          </div>
-        </div>
-
-        {/* Players Available */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Available</span>
-            <Clock className="w-4 h-4 text-amber-500" />
-          </div>
-          <div>
-            <span className="font-['Outfit'] font-extrabold text-2xl md:text-3xl text-amber-600">
-              {summary.playersAvailable}
-            </span>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {summary.playersUnsold > 0 ? `(${summary.playersUnsold} Unsold)` : 'Open for auction'}
-            </p>
-          </div>
-        </div>
-
-        {/* Total Points Spent */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Points Spent</span>
-            <Coins className="w-4 h-4 text-indigo-500" />
-          </div>
-          <div>
-            <span className="font-['Outfit'] font-extrabold text-2xl md:text-3xl text-slate-900">
-              {formatPoints(summary.totalAuctionPointsSpent)}
-            </span>
-            <p className="text-[11px] text-slate-500 mt-0.5">Auction points spent</p>
-          </div>
-        </div>
-
-        {/* Total Committee Extra Cash */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Extra Cash ₹</span>
-            <IndianRupee className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div>
-            <span className="font-['Outfit'] font-extrabold text-2xl md:text-3xl text-emerald-600">
-              {formatINR(summary.totalCommitteeCash)}
-            </span>
-            <p className="text-[11px] text-slate-500 mt-0.5">Penalties & Fees</p>
-          </div>
-        </div>
-
-        {/* Progress % */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Progress</span>
-            <TrendingUp className="w-4 h-4 text-indigo-600" />
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1">
-              <span className="font-['Outfit'] font-extrabold text-2xl md:text-3xl text-indigo-600">
-                {summary.auctionProgressPct}%
+              <span className="px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono font-bold border border-indigo-400/30">
+                {currentPlayer?.code || 'P001'}
               </span>
             </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
-              <div
-                className="bg-indigo-600 h-full rounded-full transition-all duration-500"
-                style={{ width: `${summary.auctionProgressPct}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* TEAM-WISE LIVE TABLE */}
-      <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-4 md:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-          <div>
-            <h3 className="font-['Outfit'] font-extrabold text-base md:text-lg text-slate-900 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-indigo-600" />
-              <span>TEAM-WISE LIVE AUCTION TABLE</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Purse: {formatINR(settings.startingPoints)} pts • {settings.maxSquadSize} Max Players • Safe Bidding Floor
-            </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              onClick={() => onNavigate('team-squads')}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold shadow-2xs transition-colors flex items-center gap-1.5"
-            >
-              <Trophy className="w-3.5 h-3.5 text-amber-500" />
-              <span>View Squads ({settings.maxSquadSize} Slots)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Responsive Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-['Outfit'] uppercase tracking-wider text-[11px] border-b border-slate-200">
-              <tr>
-                <th className="py-3.5 px-4 font-bold">TEAM</th>
-                <th className="py-3.5 px-3 font-bold text-center">SQUAD PLAYERS</th>
-                <th className="py-3.5 px-3 font-bold text-center">SLOTS LEFT</th>
-                <th className="py-3.5 px-3 font-bold text-right">POINTS SPENT</th>
-                <th className="py-3.5 px-3 font-bold text-right">POINTS REMAINING</th>
-                <th className="py-3.5 px-3 font-bold text-right">MAX SAFE BID</th>
-                <th className="py-3.5 px-3 font-bold text-right">COMMITTEE ₹</th>
-                <th className="py-3.5 px-4 font-bold text-center">STATUS</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {teams.map((team) => {
-                const statusBadge = getTeamStatusBadge(team.status);
-                const squadProgressPct = Math.min(
-                  100,
-                  Math.round((team.totalPlayers / settings.maxSquadSize) * 100)
-                );
-
-                return (
-                  <tr
-                    key={team.id}
-                    onClick={() => onSelectTeamForSquad && onSelectTeamForSquad(team.id)}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
-                  >
-                    {/* Team Name & Short Code */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center font-['Outfit'] font-black text-xs shrink-0 shadow-2xs"
-                          style={{ backgroundColor: team.badgeBg || team.color, color: team.badgeText || '#ffffff' }}
-                        >
-                          {team.shortCode}
-                        </div>
-                        <div>
-                          <span className="font-['Outfit'] font-bold text-slate-900 block">
-                            {team.name}
-                          </span>
-                          {/* Mini progress bar */}
-                          <div className="w-24 bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${squadProgressPct}%`,
-                                backgroundColor: team.color,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Total Players */}
-                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
-                      {team.totalPlayers} / {settings.maxSquadSize}
-                    </td>
-
-                    {/* Slots Left */}
-                    <td className="py-3 px-3 text-center font-mono text-slate-600">
-                      {Math.max(0, settings.maxSquadSize - team.totalPlayers)}
-                    </td>
-
-                    {/* Points Spent */}
-                    <td className="py-3 px-3 text-right font-mono font-semibold text-slate-700">
-                      {formatPoints(team.totalPointsSpent)}
-                    </td>
-
-                    {/* Points Remaining */}
-                    <td className="py-3 px-3 text-right font-mono">
-                      <span
-                        className={`font-bold ${
-                          team.pointsRemaining < 0
-                            ? 'text-rose-600'
-                            : team.pointsRemaining === 0
-                            ? 'text-slate-400'
-                            : 'text-emerald-600'
-                        }`}
-                      >
-                        {formatPoints(team.pointsRemaining)}
-                      </span>
-                    </td>
-
-                    {/* Max Safe Bid */}
-                    <td className="py-3 px-3 text-right font-mono font-bold text-indigo-600">
-                      {formatPoints(team.maxSafeBid)}
-                    </td>
-
-                    {/* Committee ₹ */}
-                    <td className="py-3 px-3 text-right font-mono">
-                      {team.committeeCash > 0 ? (
-                        <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                          {formatINR(team.committeeCash)}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">₹0</span>
-                      )}
-                    </td>
-
-                    {/* Status Badge */}
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold border font-['Outfit'] uppercase tracking-wider ${statusBadge.bg} ${statusBadge.text} ${statusBadge.border}`}
-                      >
-                        {team.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* SOLD PLAYERS (IN SHORT) */}
-      <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-4 md:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-              <UserCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-['Outfit'] font-extrabold text-base md:text-lg text-slate-900">
-                  SOLD PLAYERS ROSTER
-                </h3>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-mono font-bold">
-                  {soldPlayers.length} Sold
-                </span>
+          {/* Active Player Card Body */}
+          <div className="p-5 flex-1 flex flex-col justify-between">
+            <div className="flex items-center gap-4">
+              {/* Player Avatar / Photo */}
+              <div className="relative shrink-0">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-100 border-2 border-indigo-200 flex items-center justify-center text-indigo-700 shadow-inner overflow-hidden">
+                  {currentPlayer?.photoUrl ? (
+                    <img
+                      src={currentPlayer.photoUrl}
+                      alt={currentPlayer.name}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-400" />
+                  )}
+                </div>
+                <div className="absolute -bottom-1.5 -right-1.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                    <Gavel className="w-3 h-3" />
+                  </span>
+                </div>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Summary of players hammered down and allocated to franchises
-              </p>
+
+              {/* Player Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border font-['Outfit'] ${
+                      currentPlayer ? getRoleBadgeStyle(currentPlayer.role).bg : 'bg-slate-100'
+                    } ${
+                      currentPlayer ? getRoleBadgeStyle(currentPlayer.role).text : 'text-slate-700'
+                    } ${
+                      currentPlayer ? getRoleBadgeStyle(currentPlayer.role).border : 'border-slate-200'
+                    }`}
+                  >
+                    {currentPlayer?.role || 'All-Rounder'}
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500 font-semibold">
+                    Reserve: {formatPoints(currentPlayer?.basePrice || 500)} pts
+                  </span>
+                </div>
+
+                <h2 className="font-['Outfit'] font-black text-xl sm:text-2xl text-slate-900 tracking-tight truncate">
+                  {currentPlayer?.name || 'Ready for Next Player'}
+                </h2>
+
+                <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 truncate">
+                  <span>Status:</span>
+                  <span
+                    className={`font-bold uppercase ${
+                      currentPlayer?.status === 'SOLD'
+                        ? 'text-emerald-600'
+                        : currentPlayer?.status === 'UNSOLD'
+                        ? 'text-rose-600'
+                        : 'text-amber-600'
+                    }`}
+                  >
+                    {currentPlayer?.status || 'AVAILABLE'}
+                  </span>
+                  {currentPlayer?.status === 'SOLD' && currentPlayer.soldToTeamId && (
+                    <span className="text-slate-700 font-medium truncate">
+                      (Sold to{' '}
+                      {teams.find((t) => t.id === currentPlayer.soldToTeamId)?.name || 'Team'})
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Live Indicators: Current Highest Bid & Leading Team */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-3 mt-4">
+              {/* Current Highest Bid */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex flex-col justify-between">
+                <span className="text-[10px] font-bold tracking-wider uppercase text-indigo-700 font-['Outfit']">
+                  CURRENT HIGHEST BID
+                </span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="font-['Outfit'] font-black text-2xl sm:text-3xl text-indigo-950">
+                    {formatPoints(currentBidAmount)}
+                  </span>
+                  <span className="text-xs font-bold text-indigo-600 uppercase">Points</span>
+                </div>
+                <div className="mt-0.5 text-[10px] text-slate-500">
+                  Min bid increment: 500 points
+                </div>
+              </div>
+
+              {/* Leading Bidding Team */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
+                <span className="text-[10px] font-bold tracking-wider uppercase text-slate-600 font-['Outfit']">
+                  LEADING BIDDING TEAM
+                </span>
+                <div className="mt-1 flex items-center gap-2">
+                  {leadingTeam ? (
+                    <>
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs text-white shadow-xs shrink-0"
+                        style={{ backgroundColor: leadingTeam.color }}
+                      >
+                        {leadingTeam.short}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-['Outfit'] font-black text-sm text-slate-900 truncate">
+                          {leadingTeam.name}
+                        </h4>
+                        <span className="text-[10px] text-slate-500 font-mono block truncate">
+                          Rem: {formatPoints(leadingTeam.pointsRemaining)} pts
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 text-slate-400 py-1">
+                      <Clock className="w-4 h-4 text-slate-400" />
+                      <span className="text-xs font-semibold text-slate-500">
+                        Awaiting Opening Bid
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-0.5 text-[10px] text-slate-400 truncate">
+                  {leadingTeam ? 'Holding hammer offer' : 'Floor price ready'}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* Search Filter */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                value={soldSearch}
-                onChange={(e) => setSoldSearch(e.target.value)}
-                placeholder="Search sold players..."
-                className="w-44 sm:w-56 bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-              />
+          {/* Action Footer */}
+          <div className="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+              <Shield className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>Live sync connected</span>
             </div>
+
             <button
-              onClick={() => onNavigate('auction-history')}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-colors shrink-0 flex items-center gap-1 shadow-2xs"
+              onClick={() => onNavigate('live-auction')}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
             >
-              <span>Ledger</span>
+              <span>{role === 'admin' ? 'Open Live Desk' : 'Spectate Stage'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {soldPlayers.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-xs space-y-1">
-            <UserCheck className="w-8 h-8 mx-auto text-slate-300 stroke-1" />
-            <p className="font-medium text-slate-600">No players have been sold yet.</p>
-            <p className="text-slate-400 text-[11px]">
-              Players sold through the live auction hammer will be listed here with their winning franchise and points.
+        {/* ========================================================================= */}
+        {/* TEAMS SUMMARY TABLE (Center Column - 5 cols on XL - BETWEEN AUCTION & HISTORY) */}
+        {/* ========================================================================= */}
+        <div className="xl:col-span-5 bg-white rounded-3xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-2">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-indigo-600" />
+                <h3 className="font-['Outfit'] font-black text-sm uppercase tracking-wider text-slate-900">
+                  Teams Summary Table
+                </h3>
+              </div>
+              <span className="text-[11px] font-mono font-bold text-indigo-700 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200">
+                Purse: {formatPoints(settings.startingPoints)} pts
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 mb-3">
+              Financial budget, purse expenditure, and current squad quotas:
             </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto max-h-72 overflow-y-auto scrollbar-thin">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-['Outfit'] uppercase tracking-wider text-[10px] border-b border-slate-200 sticky top-0 z-10">
-                <tr>
-                  <th className="py-2.5 px-4 font-bold"># CODE & PLAYER</th>
-                  <th className="py-2.5 px-3 font-bold">ROLE</th>
-                  <th className="py-2.5 px-4 font-bold">SOLD TO FRANCHISE</th>
-                  <th className="py-2.5 px-4 font-bold text-right">HAMMER PRICE</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {filteredSoldPlayers.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-6 text-center text-slate-400 text-xs">
-                      No sold players matching &quot;{soldSearch}&quot;
-                    </td>
+
+            {/* Responsive Table */}
+            <div className="overflow-x-auto max-h-[330px] overflow-y-auto pr-1">
+              <table className="w-full text-left text-xs min-w-[440px]">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-600 font-['Outfit']">
+                    <th className="py-2.5 px-3">Team Name</th>
+                    <th className="py-2.5 px-2 text-center">Squad</th>
+                    <th className="py-2.5 px-2 text-right">Spent</th>
+                    <th className="py-2.5 px-3 text-right">Remaining</th>
+                    <th className="py-2.5 px-2 text-right">Max Bid</th>
+                    <th className="py-2.5 px-2 text-center">Status</th>
                   </tr>
-                ) : (
-                  filteredSoldPlayers.map((player) => {
-                    const team = teams.find((t) => t.id === player.soldToTeamId);
-                    const roleStyle = getRoleBadgeStyle(player.role);
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {teams.map((team) => {
+                    const statusBadge = getTeamStatusBadge(team.status);
+                    const slotsUsed = team.totalPlayers;
+                    const isFull = slotsUsed >= settings.maxSquadSize;
+
                     return (
-                      <tr key={player.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-2.5 px-4">
+                      <tr
+                        key={team.id}
+                        onClick={() => onSelectTeamForSquad?.(team.id)}
+                        className="hover:bg-slate-50/90 transition-colors cursor-pointer group"
+                        title={`Click to view ${team.name} in squad matrix`}
+                      >
+                        {/* Team Name */}
+                        <td className="py-2 px-3">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-indigo-600 font-bold text-[11px]">
-                              {player.code}
-                            </span>
-                            <span className="font-['Outfit'] font-bold text-slate-900">
-                              {player.name}
+                            <div
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-white font-black text-[10px] shadow-2xs shrink-0"
+                              style={{ backgroundColor: team.color }}
+                            >
+                              {team.short}
+                            </div>
+                            <span className="font-bold text-slate-900 text-xs font-['Outfit'] truncate max-w-[105px] group-hover:text-indigo-600 transition-colors">
+                              {team.name}
                             </span>
                           </div>
                         </td>
-                        <td className="py-2.5 px-3">
+
+                        {/* Squad Count */}
+                        <td className="py-2 px-2 text-center font-mono text-xs">
+                          <span className={`font-bold ${isFull ? 'text-indigo-600' : 'text-slate-900'}`}>
+                            {slotsUsed}
+                          </span>
+                          <span className="text-slate-400 text-[10px]">/{settings.maxSquadSize}</span>
+                        </td>
+
+                        {/* Spent Amount */}
+                        <td className="py-2 px-2 text-right font-mono text-slate-600 text-xs font-semibold">
+                          {formatPoints(team.totalPointsSpent)}
+                        </td>
+
+                        {/* Remaining Purse */}
+                        <td className="py-2 px-3 text-right font-mono">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${roleStyle.bg} ${roleStyle.text} ${roleStyle.border}`}
+                            className={`font-black text-xs ${
+                              team.pointsRemaining < 0
+                                ? 'text-rose-600'
+                                : team.pointsRemaining === 0
+                                ? 'text-slate-400'
+                                : 'text-emerald-600'
+                            }`}
                           >
-                            {player.role}
+                            {formatPoints(team.pointsRemaining)}
                           </span>
                         </td>
-                        <td className="py-2.5 px-4">
-                          {team ? (
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="w-5 h-5 rounded text-[9px] font-black flex items-center justify-center shrink-0 shadow-2xs"
-                                style={{ backgroundColor: team.badgeBg || team.color, color: team.badgeText || '#ffffff' }}
-                              >
-                                {team.shortCode}
-                              </span>
-                              <span className="font-['Outfit'] font-semibold text-slate-800">
-                                {team.name}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic">Unassigned</span>
-                          )}
+
+                        {/* Max Safe Bid */}
+                        <td className="py-2 px-2 text-right font-mono font-bold text-indigo-600 text-xs">
+                          {formatPoints(team.maxSafeBid)}
                         </td>
-                        <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
-                          {formatPoints(player.soldPrice)} pts
+
+                        {/* Status */}
+                        <td className="py-2 px-2 text-center">
+                          <span
+                            className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border font-['Outfit'] uppercase ${statusBadge.bg} ${statusBadge.text} ${statusBadge.border}`}
+                          >
+                            {team.status}
+                          </span>
                         </td>
                       </tr>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )}
+
+          <div className="pt-3 border-t border-slate-100 mt-2 flex items-center justify-between text-xs">
+            <span className="text-[11px] text-slate-500 font-mono">
+              Total Spent: <strong className="text-slate-800">{formatPoints(summary.totalAuctionPointsSpent)} pts</strong>
+            </span>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {teams.length} Franchises Competing
+            </span>
+          </div>
+        </div>
+
+        {/* AUCTION HISTORY (Right Column - 3 cols on XL) */}
+        <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between min-h-[380px]">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-indigo-600" />
+                <h3 className="font-['Outfit'] font-black text-sm uppercase tracking-wider text-slate-900">
+                  Auction History Feed
+                </h3>
+              </div>
+              <span className="text-[11px] font-mono font-bold text-slate-500">
+                {effectiveTransactions.length} Total
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 mb-3">
+              Chronological log of recent hammer bids:
+            </p>
+
+            <div className="overflow-y-auto space-y-2.5 max-h-[320px] pr-1">
+              {recentTransactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center p-4 text-slate-400">
+                  <Gavel className="w-8 h-8 text-slate-300 mb-2" />
+                  <p className="text-xs font-semibold text-slate-500">No transactions recorded yet</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Live bids and confirmed sales will stream here automatically.
+                  </p>
+                </div>
+              ) : (
+                recentTransactions.map((tx) => {
+                  const team = teams.find((t) => t.id === tx.teamId);
+                  const roleName = tx.role || (tx as any).playerRole || 'All-Rounder';
+                  const roleBadge = getRoleBadgeStyle(roleName);
+                  const hammerPrice = tx.soldPrice ?? (tx as any).amount ?? (tx as any).points ?? 0;
+                  const formattedTime = formatTransactionTime(tx.timestamp);
+
+                  return (
+                    <div
+                      key={tx.id}
+                      onClick={() => onNavigate('auction-history')}
+                      className="p-2 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-100/90 transition-colors flex items-center justify-between gap-2.5 cursor-pointer group"
+                      title="View in Auction Transaction Audit Log"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-['Outfit'] font-bold text-xs text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                            {tx.playerName}
+                          </span>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${roleBadge.bg} ${roleBadge.text} ${roleBadge.border}`}
+                          >
+                            {roleName.slice(0, 3)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: team?.color || '#6366f1' }}
+                          />
+                          <span className="font-semibold text-slate-700 truncate text-[11px]">
+                            {tx.teamName || team?.name || 'Franchise Team'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="font-['Outfit'] font-black text-xs text-indigo-900 block">
+                          {formatPoints(hammerPrice)} pts
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {formattedTime}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-xs">
+            <span className="text-[11px] text-slate-400">Activity feed</span>
+            <button
+              onClick={() => onNavigate('auction-history')}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+            >
+              <span>Full Ledger</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. TEAM SQUADS MATRIX (PROMINENTLY INTEGRATED ON MAIN SCREEN)             */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+              <h2 className="font-['Outfit'] font-black text-xl text-slate-900 tracking-tight">
+                Team Squads Matrix
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live squad rosters, slot quotas, and active purse allocations across all franchises
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">
+              {teams.length} Teams Competing
+            </span>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Max {settings.maxSquadSize} Players / Team
+            </span>
+          </div>
+        </div>
+
+        {/* Teams Grid Matrix */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {teams.map((team) => {
+            const squadPlayers = players.filter((p) => p.soldToTeamId === team.id);
+            const slotsUsed = squadPlayers.length;
+            const slotsRemaining = Math.max(0, settings.maxSquadSize - slotsUsed);
+            const progressPercent = Math.min(100, Math.round((slotsUsed / settings.maxSquadSize) * 100));
+
+            // Role breakdown count
+            const batCount = squadPlayers.filter((p) => p.role === 'Batsman').length;
+            const bowlCount = squadPlayers.filter((p) => p.role === 'Bowler').length;
+            const arCount = squadPlayers.filter((p) => p.role === 'All-Rounder').length;
+            const wkCount = squadPlayers.filter((p) => p.role === 'Wicket-Keeper').length;
+
+            return (
+              <div
+                key={team.id}
+                className="rounded-2xl border border-slate-200 bg-white hover:border-slate-300 shadow-xs flex flex-col overflow-hidden transition-all"
+              >
+                {/* Team Card Header Banner */}
+                <div
+                  className="p-4 text-white flex items-center justify-between"
+                  style={{ backgroundColor: team.color }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-black font-['Outfit'] text-sm tracking-wider border border-white/30">
+                      {team.short}
+                    </div>
+                    <div>
+                      <h3 className="font-['Outfit'] font-black text-base leading-tight">
+                        {team.name}
+                      </h3>
+                      <span className="text-[11px] font-mono text-white/90">
+                        Purse: {formatPoints(team.pointsRemaining)} pts
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-sm bg-black/25 px-2 py-0.5 rounded-md">
+                      {slotsUsed}/{settings.maxSquadSize}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-slate-100 h-1.5">
+                  <div
+                    className="h-full transition-all duration-300"
+                    style={{
+                      width: `${progressPercent}%`,
+                      backgroundColor: team.color,
+                    }}
+                  />
+                </div>
+
+                {/* Role Pill Breakdown */}
+                <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] font-semibold text-slate-600">
+                  <span>{batCount} Bat</span>
+                  <span>•</span>
+                  <span>{bowlCount} Bowl</span>
+                  <span>•</span>
+                  <span>{arCount} AR</span>
+                  <span>•</span>
+                  <span>{wkCount} WK</span>
+                </div>
+
+                {/* Team Roster List */}
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {squadPlayers.length === 0 ? (
+                      <div className="py-6 text-center text-slate-400">
+                        <Users className="w-6 h-6 mx-auto mb-1 text-slate-300" />
+                        <p className="text-xs font-semibold text-slate-500">No players acquired yet</p>
+                        <p className="text-[11px] text-slate-400">
+                          {settings.maxSquadSize} open roster slots available
+                        </p>
+                      </div>
+                    ) : (
+                      squadPlayers.map((p, idx) => {
+                        const badge = getRoleBadgeStyle(p.role);
+                        return (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-xs transition-colors"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono text-[10px] text-slate-400 w-4">
+                                {idx + 1}.
+                              </span>
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-900 truncate block">
+                                  {p.name}
+                                </span>
+                                <span
+                                  className={`inline-block text-[9px] font-bold px-1 rounded uppercase border ${badge.bg} ${badge.text} ${badge.border}`}
+                                >
+                                  {p.role}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className="font-mono font-bold text-indigo-900 text-xs shrink-0">
+                              {formatPoints(p.soldPrice)} pts
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Vacancy Notice & Safe Bid */}
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                    <span>
+                      {slotsRemaining > 0
+                        ? `${slotsRemaining} slots vacant`
+                        : 'Squad capacity full'}
+                    </span>
+                    <span className="font-mono text-indigo-700 font-bold">
+                      Max Bid: {formatPoints(team.maxSafeBid)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. PLAYER STATUS TABS                                                     */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-600" />
+              <h2 className="font-['Outfit'] font-black text-xl text-slate-900 tracking-tight">
+                Player Status Breakdown
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live tracking of sold players, unsold players, and remaining draft pool
+            </p>
+          </div>
+
+          {/* Quick Search */}
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={playerSearchQuery}
+              onChange={(e) => setPlayerSearchQuery(e.target.value)}
+              placeholder="Search player name or code..."
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {/* Tab Buttons */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('sold')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold font-['Outfit'] flex items-center gap-2 transition-all ${
+              activeTab === 'sold'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Sold Players ({soldPlayers.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('unsold')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold font-['Outfit'] flex items-center gap-2 transition-all ${
+              activeTab === 'unsold'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <XCircle className="w-4 h-4" />
+            <span>Unsold Players ({unsoldPlayers.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('pool')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold font-['Outfit'] flex items-center gap-2 transition-all ${
+              activeTab === 'pool'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>Remaining Pool ({poolPlayers.length})</span>
+          </button>
+        </div>
+
+        {/* Players Tab Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-600 font-['Outfit']">
+                <th className="py-3 px-4">Code</th>
+                <th className="py-3 px-4">Player Name</th>
+                <th className="py-3 px-3">Role</th>
+                <th className="py-3 px-3 text-right">Base Price</th>
+                {activeTab === 'sold' && (
+                  <>
+                    <th className="py-3 px-4">Winning Team</th>
+                    <th className="py-3 px-4 text-right">Sold Price</th>
+                  </>
+                )}
+                {activeTab !== 'sold' && (
+                  <th className="py-3 px-4 text-center">Status</th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredTabPlayers.length === 0 ? (
+                <tr>
+                  <td colSpan={activeTab === 'sold' ? 6 : 5} className="py-8 text-center text-slate-400">
+                    No players found for this category.
+                  </td>
+                </tr>
+              ) : (
+                filteredTabPlayers.map((player) => {
+                  const roleBadge = getRoleBadgeStyle(player.role);
+                  const soldTeam = teams.find((t) => t.id === player.soldToTeamId);
+
+                  return (
+                    <tr key={player.id} className="hover:bg-slate-50/80 transition-colors">
+                      {/* Code */}
+                      <td className="py-3 px-4 font-mono font-bold text-indigo-700">
+                        {player.code}
+                      </td>
+
+                      {/* Name */}
+                      <td className="py-3 px-4 font-bold text-slate-900 font-['Outfit'] text-sm">
+                        {player.name}
+                      </td>
+
+                      {/* Role */}
+                      <td className="py-3 px-3">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border font-['Outfit'] ${roleBadge.bg} ${roleBadge.text} ${roleBadge.border}`}
+                        >
+                          {player.role}
+                        </span>
+                      </td>
+
+                      {/* Base Price */}
+                      <td className="py-3 px-3 text-right font-mono text-slate-600 font-medium">
+                        {formatPoints(player.basePrice || 500)} pts
+                      </td>
+
+                      {/* Sold Specific: Winning Team & Price */}
+                      {activeTab === 'sold' && (
+                        <>
+                          <td className="py-3 px-4">
+                            {soldTeam ? (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: soldTeam.color }}
+                                />
+                                <span className="font-bold text-slate-800 font-['Outfit']">
+                                  {soldTeam.name}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-black text-emerald-700 text-sm">
+                            {formatPoints(player.soldPrice)} pts
+                          </td>
+                        </>
+                      )}
+
+                      {/* Unsold & Pool Specific: Status */}
+                      {activeTab !== 'sold' && (
+                        <td className="py-3 px-4 text-center">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-md text-[10px] font-bold font-['Outfit'] uppercase ${
+                              player.status === 'UNSOLD'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-sky-50 text-sky-700 border border-sky-200'
+                            }`}
+                          >
+                            {player.status === 'UNSOLD' ? 'Passed / Unsold' : 'In Draft Pool'}
+                          </span>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

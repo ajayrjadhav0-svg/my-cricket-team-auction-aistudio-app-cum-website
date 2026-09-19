@@ -16,9 +16,11 @@ import {
   Smartphone,
   Database,
   Archive,
+  Save,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { formatPoints, formatINR } from '../utils/formatters';
+import { generateClientStandaloneHTML } from '../utils/generateHTMLReport';
 
 interface AuctionExportModalProps {
   isOpen: boolean;
@@ -29,12 +31,14 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { state, getViewerShareUrl, showNotification } = useAuction();
+  const { state, getViewerShareUrl, showNotification, saveFileAs } = useAuction();
   const [copiedText, setCopiedText] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeTab, setActiveTab] = useState<'options' | 'print-preview'>('options');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [targetFileName, setTargetFileName] = useState('myauctionkpl');
+  const [isSavingServer, setIsSavingServer] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstall = (e: any) => {
@@ -73,18 +77,88 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
   const { settings, teams, players, transactions, summary } = state;
   const soldPlayers = players.filter((p) => p.status === 'SOLD');
 
-  const handleDownloadHTML = () => {
-    window.location.href = '/api/export/html';
-    showNotification('success', 'Downloading standalone offline HTML auction report...');
+  const cleanFileName = (targetFileName.trim() || 'myauctionkpl').replace(/[^a-zA-Z0-9_-]/g, '');
+
+  const handleDownloadHTML = async () => {
+    try {
+      showNotification('info', `Preparing standalone offline HTML report (${cleanFileName}.html)...`);
+      let htmlContent = '';
+      try {
+        const response = await fetch(`/api/export/html?filename=${encodeURIComponent(cleanFileName)}`);
+        if (response.ok) {
+          htmlContent = await response.text();
+        }
+      } catch (e) {
+        console.warn('Server HTML fetch failed, fallback to client-side generator', e);
+      }
+
+      if (!htmlContent || htmlContent.length < 500) {
+        htmlContent = generateClientStandaloneHTML(state);
+      }
+
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${cleanFileName}.html`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showNotification('success', `Downloaded standalone offline report: ${cleanFileName}.html!`);
+    } catch (err: any) {
+      // Direct client fallback
+      const htmlContent = generateClientStandaloneHTML(state);
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${cleanFileName}.html`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showNotification('success', `Downloaded offline HTML report: ${cleanFileName}.html`);
+    }
   };
 
   const handleOpenHTML = () => {
-    window.open('/api/export/html?view=1', '_blank');
+    try {
+      const htmlContent = generateClientStandaloneHTML(state);
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      showNotification('info', 'Opened complete HTML report in new tab');
+    } catch (err) {
+      window.open(`/api/export/html?view=1&filename=${encodeURIComponent(cleanFileName)}`, '_blank');
+    }
   };
 
-  const handleDownloadJSON = () => {
-    window.location.href = '/api/export/json';
-    showNotification('success', 'Downloading complete JSON database backup...');
+  const handleDownloadJSON = async () => {
+    try {
+      const jsonContent = JSON.stringify(state, null, 2);
+      const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${cleanFileName}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Also persist on server
+      await saveFileAs(cleanFileName);
+      showNotification('success', `Exported and saved ${cleanFileName}.json!`);
+    } catch (err: any) {
+      showNotification('error', `Failed to export JSON: ${err.message}`);
+    }
+  };
+
+  const handleSaveToServerOnly = async () => {
+    setIsSavingServer(true);
+    await saveFileAs(cleanFileName);
+    setIsSavingServer(false);
   };
 
   // Generate plain-text summary for sharing (WhatsApp, Telegram, Notes)
@@ -164,7 +238,20 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
         return `${p.id},"${p.code}","${p.name.replace(/"/g, '""')}","${p.role}","${p.status}","${(team || '').replace(/"/g, '""')}",${p.soldPrice}`;
       })
       .join('\n');
-    downloadCSV(headers + rows, `${settings.tournamentName.toLowerCase().replace(/\s+/g, '_')}_players.csv`);
+    downloadCSV(headers + rows, `${cleanFileName}_players.csv`);
+  };
+
+  const handleExportPlayersRegistrationCSV = () => {
+    const headers = 'SR no,name,role,village\n';
+    const rows = players
+      .map((p, idx) => {
+        const sr = p.srNo || idx + 1;
+        const v = (p.village || '').replace(/"/g, '""');
+        const n = p.name.replace(/"/g, '""');
+        return `${sr},"${n}","${p.role}","${v}"`;
+      })
+      .join('\n');
+    downloadCSV(headers + rows, `${cleanFileName}_players_registration.csv`);
   };
 
   const handleExportSquadsCSV = () => {
@@ -182,17 +269,20 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
         });
       }
     });
-    downloadCSV(headers + rows.join('\n'), `${settings.tournamentName.toLowerCase().replace(/\s+/g, '_')}_squads.csv`);
+    downloadCSV(headers + rows.join('\n'), `${cleanFileName}_squads.csv`);
   };
 
   const handleExportLedgerCSV = () => {
     const headers = 'Timestamp,Auction Order,Player ID,Player Name,Role,Purchased By Team,Sold Price (Points),Penalty Cash (INR)\n';
-    const rows = transactions
+    const rows = (transactions || [])
       .map((t) => {
-        return `"${t.timestamp}",${t.auctionOrder},"P${t.playerId.toString().padStart(3, '0')}","${t.playerName.replace(/"/g, '""')}","${t.role}","${t.teamName.replace(/"/g, '""')}",${t.soldPrice},${t.committeeCharge}`;
+        const roleName = t.role || (t as any).playerRole || 'All-Rounder';
+        const hammerPrice = t.soldPrice ?? (t as any).amount ?? (t as any).points ?? 0;
+        const penalty = t.committeeCharge ?? (t as any).committeeCash ?? 0;
+        return `"${t.timestamp || ''}",${t.auctionOrder || 1},"P${(t.playerId || 0).toString().padStart(3, '0')}","${(t.playerName || '').replace(/"/g, '""')}","${roleName}","${(t.teamName || '').replace(/"/g, '""')}",${hammerPrice},${penalty}`;
       })
       .join('\n');
-    downloadCSV(headers + rows, `${settings.tournamentName.toLowerCase().replace(/\s+/g, '_')}_auction_ledger.csv`);
+    downloadCSV(headers + rows, `${cleanFileName}_auction_ledger.csv`);
   };
 
   return (
@@ -257,6 +347,67 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {activeTab === 'options' ? (
             <div className="space-y-6">
+              {/* PRIMARY ACTION: Save File As myauctionkpl */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 text-white shadow-md border border-slate-800 space-y-3.5">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 shadow-inner">
+                      <Database className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-['Outfit'] font-black text-base text-white tracking-wide">
+                          SAVE FILE AS
+                        </h3>
+                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          {cleanFileName}.json
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-0.5">
+                        Save and export your complete auction database, rosters, and ledger under a custom file name.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* File Name Controls */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        id="input-save-filename"
+                        value={targetFileName}
+                        onChange={(e) => setTargetFileName(e.target.value)}
+                        placeholder="myauctionkpl"
+                        className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-xs focus:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 w-36 sm:w-44 pr-10"
+                      />
+                      <span className="absolute right-2.5 top-2.5 text-[10px] font-mono text-slate-400 pointer-events-none">
+                        .json
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={handleDownloadJSON}
+                      id="btn-save-and-download-myauctionkpl"
+                      className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-['Outfit'] font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all shrink-0"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>SAVE & DOWNLOAD ({cleanFileName}.json)</span>
+                    </button>
+
+                    <button
+                      onClick={handleSaveToServerOnly}
+                      disabled={isSavingServer}
+                      id="btn-save-server-only"
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-['Outfit'] font-bold text-xs flex items-center gap-1.5 border border-slate-700 active:scale-95 transition-all shrink-0"
+                      title="Save to server disk without triggering browser download"
+                    >
+                      <Save className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>{isSavingServer ? 'Saving...' : 'Save to Server'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Quick Action Bar for Instant Print / PDF */}
               <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
@@ -290,7 +441,36 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                   <span>EXCEL & CSV SPREADSHEET FILES (SIMPLE FORMAT)</span>
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Card 0: Registration Roster (SR No, Name, Role, Village) */}
+                  <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-200 hover:border-indigo-400 hover:shadow-sm transition-all flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs mb-2 shadow-2xs">
+                        📋
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
+                          Player Registration List
+                        </h4>
+                        <span className="text-[9px] font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded uppercase">
+                          CSV
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Clean 4-column format: <strong>SR no, name, role, village</strong> for all {players.length} registered players.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleExportPlayersRegistrationCSV}
+                      id="btn-download-players-reg-csv"
+                      className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5 text-indigo-200" />
+                      <span>Download (SR, Name, Role, Village)</span>
+                    </button>
+                  </div>
+
                   {/* Card 1: All Players */}
                   <div className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-emerald-300 hover:shadow-sm transition-all flex flex-col justify-between space-y-3">
                     <div>
@@ -332,7 +512,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                     <button
                       onClick={handleExportSquadsCSV}
                       id="btn-download-squads-csv"
-                      className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                      className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download Squads CSV</span>
@@ -381,7 +561,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                       </div>
                       <div className="flex items-center gap-2">
                         <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
-                          Standalone Offline HTML (.html)
+                          Standalone Offline HTML ({cleanFileName}.html)
                         </h4>
                         <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-indigo-600 text-white uppercase">
                           Single File
@@ -399,7 +579,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                         className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>Download .HTML</span>
+                        <span>Download {cleanFileName}.html</span>
                       </button>
                       <button
                         onClick={handleOpenHTML}
@@ -420,7 +600,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                         <Database className="w-4 h-4 text-slate-800" />
                       </div>
                       <h4 className="font-['Outfit'] font-bold text-slate-900 text-sm">
-                        Complete JSON Backup (.json)
+                        Complete JSON Backup ({cleanFileName}.json)
                       </h4>
                       <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                         Full machine-readable snapshot containing all tournament rules, team budgets, player rosters, and bid transactions.
@@ -433,7 +613,7 @@ export const AuctionExportModal: React.FC<AuctionExportModalProps> = ({
                       className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
                     >
                       <Download className="w-3.5 h-3.5 text-slate-300" />
-                      <span>Download JSON Backup</span>
+                      <span>Download {cleanFileName}.json</span>
                     </button>
                   </div>
                 </div>

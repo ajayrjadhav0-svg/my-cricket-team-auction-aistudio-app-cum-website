@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Eye, EyeOff, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Shield, Lock, User, Eye, EyeOff, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuction } from '../../context/AuctionContext';
 
 interface AdminLoginModalProps {
@@ -14,8 +14,9 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onSuccess,
 }) => {
   const { loginAdmin } = useAuction();
-  const [passcode, setPasscode] = useState('');
-  const [showPasscode, setShowPasscode] = useState(false);
+  const [userId, setUserId] = useState('admin');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -26,16 +27,16 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     setErrorMsg('');
     setIsSubmitting(true);
 
-    const success = loginAdmin(passcode);
+    const success = loginAdmin(userId, password);
     setIsSubmitting(false);
 
     if (success) {
-      setPasscode('');
+      setPassword('');
       setErrorMsg('');
       onClose();
       if (onSuccess) onSuccess();
     } else {
-      setErrorMsg('Incorrect administrator passcode. Please try again.');
+      setErrorMsg('Invalid User ID or Password. Please try again.');
     }
   };
 
@@ -71,40 +72,62 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         {/* Security Notice */}
         <div className="mb-5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
           <p>
-            The <strong className="text-slate-900 font-bold">Admin Panel</strong> gives complete control over player sales, hammer bidding, franchise purse budgets, and auction drafts.
+            The <strong className="text-slate-900 font-bold">Admin Panel</strong> gives complete authority to configure tournaments, register players, and execute live bidding transactions.
           </p>
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            Passcode: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-indigo-600">admin123</code> or <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-indigo-600">rbpl2026</code>
-          </p>
+          <div className="mt-2 flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-mono text-slate-600">
+            <span>User ID: <strong className="text-indigo-600">admin</strong></span>
+            <span>Password: <strong className="text-indigo-600">admin123</strong></span>
+          </div>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-              Enter Admin Passcode / Key
+              Authorized User ID
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <User className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                autoFocus
+                value={userId}
+                onChange={(e) => {
+                  setUserId(e.target.value);
+                  if (errorMsg) setErrorMsg('');
+                }}
+                placeholder="Enter admin user ID"
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium text-slate-900 outline-hidden transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
+              Security Password
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                 <Lock className="w-4 h-4" />
               </div>
               <input
-                type={showPasscode ? 'text' : 'password'}
-                autoFocus
-                value={passcode}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
                 onChange={(e) => {
-                  setPasscode(e.target.value);
+                  setPassword(e.target.value);
                   if (errorMsg) setErrorMsg('');
                 }}
-                placeholder="Enter admin passcode"
+                placeholder="Enter password"
                 className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 text-sm font-mono text-slate-900 outline-hidden transition-all"
               />
               <button
                 type="button"
-                onClick={() => setShowPasscode(!showPasscode)}
+                onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
               >
-                {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
 
@@ -126,7 +149,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !passcode.trim()}
+              disabled={isSubmitting || !userId.trim() || !password.trim()}
               className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold font-['Outfit'] flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
             >
               <CheckCircle2 className="w-4 h-4" />

@@ -50,3 +50,29 @@ export function getTeamStatusBadge(status: string): { bg: string; text: string; 
       return { bg: 'bg-zinc-500/20', text: 'text-zinc-400', border: 'border-zinc-500/40' };
   }
 }
+
+/**
+ * Safely formats transaction timestamp without throwing Invalid Date errors
+ */
+export function formatTransactionTime(timestamp?: string): string {
+  if (!timestamp) return 'Sold';
+
+  const trimmed = String(timestamp).trim();
+  if (!trimmed) return 'Sold';
+
+  // If it's already a time string e.g. "10:15:01 am" or "10:15 am" or "14:20:00"
+  if (/^\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?$/i.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+
+  try {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+  } catch {
+    // fallback
+  }
+
+  return trimmed;
+}

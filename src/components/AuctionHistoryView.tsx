@@ -15,6 +15,7 @@ import { AuctionTransaction } from '../types';
 import {
   formatINR,
   formatPoints,
+  formatTransactionTime,
   getRoleBadgeStyle,
 } from '../utils/formatters';
 import { AuctionExportModal } from './AuctionExportModal';
@@ -171,12 +172,11 @@ export const AuctionHistoryView: React.FC = () => {
                 </tr>
               ) : (
                 filteredTransactions.map((tx) => {
-                  const roleStyle = getRoleBadgeStyle(tx.role);
-                  const dateStr = new Date(tx.timestamp).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                  });
+                  const roleName = tx.role || (tx as any).playerRole || 'All-Rounder';
+                  const roleStyle = getRoleBadgeStyle(roleName);
+                  const dateStr = formatTransactionTime(tx.timestamp);
+                  const hammerPrice = tx.soldPrice ?? (tx as any).points ?? (tx as any).amount ?? 0;
+                  const penalty = tx.committeeCharge ?? (tx as any).committeeCash ?? 0;
 
                   return (
                     <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
@@ -192,7 +192,7 @@ export const AuctionHistoryView: React.FC = () => {
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${roleStyle.bg} ${roleStyle.text} ${roleStyle.border}`}
                         >
-                          {tx.role}
+                          {roleName}
                         </span>
                       </td>
 
@@ -201,13 +201,13 @@ export const AuctionHistoryView: React.FC = () => {
                       </td>
 
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                        {formatPoints((tx as any).points ?? tx.soldPrice)} pts
+                        {formatPoints(hammerPrice)} pts
                       </td>
 
                       <td className="py-3 px-3 text-right font-mono">
-                        {(tx as any).committeeCash > 0 || (tx as any).committeeCharge > 0 ? (
+                        {penalty > 0 ? (
                           <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                            {formatINR((tx as any).committeeCash || (tx as any).committeeCharge)}
+                            {formatINR(penalty)}
                           </span>
                         ) : (
                           <span className="text-slate-400">₹0</span>

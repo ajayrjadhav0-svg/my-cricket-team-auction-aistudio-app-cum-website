@@ -1,4 +1,6 @@
-{
+import { FullAuctionState } from "../types";
+
+export const DEFAULT_AUCTION_STATE: FullAuctionState = {
   "settings": {
     "tournamentName": "My Cricket League Auction",
     "maxSquadSize": 15,
@@ -186,4 +188,4 @@
     "auctionProgressPct": 0,
     "completedTeamsCount": 0
   }
-}
+};

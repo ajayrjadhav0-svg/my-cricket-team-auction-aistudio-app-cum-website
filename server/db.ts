@@ -3,6 +3,7 @@ import path from 'path';
 import {
   FullAuctionState,
   Player,
+  PlayerRole,
   Team,
   AuctionTransaction,
   TournamentSettings,
@@ -16,9 +17,12 @@ import {
   INITIAL_TEAMS,
   RAW_PLAYERS_LIST,
 } from './seedData';
+import { generateStandaloneAuctionHTML } from './htmlGenerator';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'cricket_auction_database.json');
+const KPL_DB_FILE = path.join(DATA_DIR, 'myauctionkpl.json');
+const ROOT_KPL_FILE = path.join(process.cwd(), 'myauctionkpl.json');
 
 class AuctionDatabase {
   private state: FullAuctionState;
@@ -26,6 +30,8 @@ class AuctionDatabase {
   constructor() {
     this.ensureDataDir();
     this.state = this.loadFromDisk();
+    // Guarantee myauctionkpl.json is initially saved immediately
+    this.saveToDisk();
   }
 
   private ensureDataDir() {
@@ -35,17 +41,39 @@ class AuctionDatabase {
   }
 
   private loadFromDisk(): FullAuctionState {
-    if (fs.existsSync(DB_FILE)) {
+    const fileToLoad = fs.existsSync(DB_FILE)
+      ? DB_FILE
+      : fs.existsSync(KPL_DB_FILE)
+      ? KPL_DB_FILE
+      : fs.existsSync(ROOT_KPL_FILE)
+      ? ROOT_KPL_FILE
+      : null;
+
+    if (fileToLoad) {
       try {
-        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+        const raw = fs.readFileSync(fileToLoad, 'utf-8');
         const parsed = JSON.parse(raw);
         if (parsed && parsed.teams && parsed.players) {
-          // Automatic migration: strip legacy fields and icon allocations
           let needsSave = false;
 
+          // Erase old 80 sample players if present
+          if (parsed.players.length === 80 || (parsed.players.length > 0 && parsed.players[0]?.name?.includes('ROHIT SHARMA'))) {
+            parsed.players = [];
+            parsed.transactions = [];
+            if (parsed.bidding) {
+              parsed.bidding.currentPlayerId = 0;
+              parsed.bidding.bidHistory = [];
+            }
+            needsSave = true;
+          }
+
           parsed.players.forEach((p: any) => {
-            if (p.village) {
-              delete p.village;
+            if (!p.srNo) {
+              p.srNo = p.auctionOrder || p.id;
+              needsSave = true;
+            }
+            if (p.village === undefined) {
+              p.village = '';
               needsSave = true;
             }
             if (p.isIcon || p.status === 'ICON') {
@@ -68,9 +96,51 @@ class AuctionDatabase {
                 delete t.village;
                 needsSave = true;
               }
+              // Normalize role, soldPrice, and teamName
+              if (!t.role && t.playerRole) {
+                t.role = t.playerRole;
+                needsSave = true;
+              }
+              if (t.soldPrice === undefined && (t.amount !== undefined || t.points !== undefined)) {
+                t.soldPrice = t.amount ?? t.points ?? 0;
+                needsSave = true;
+              }
+              if (!t.teamName && t.teamId) {
+                const team = parsed.teams.find((tm: any) => tm.id === t.teamId);
+                if (team) {
+                  t.teamName = team.name;
+                  needsSave = true;
+                }
+              }
             });
             if (parsed.transactions.length !== originalLength) needsSave = true;
+          } else {
+            parsed.transactions = [];
+            needsSave = true;
           }
+
+          // Ensure any SOLD player has a corresponding transaction
+          const existingTxPlayerIds = new Set(parsed.transactions.map((t: any) => t.playerId));
+          const soldPlayers = parsed.players.filter((p: any) => p.status === 'SOLD');
+          soldPlayers.forEach((p: any) => {
+            if (!existingTxPlayerIds.has(p.id)) {
+              const team = parsed.teams.find((t: any) => t.id === p.soldToTeamId);
+              parsed.transactions.push({
+                id: `tx-backfill-${p.id}`,
+                timestamp: p.soldAt || new Date().toISOString(),
+                auctionOrder: p.auctionOrder || parsed.transactions.length + 1,
+                playerId: p.id,
+                playerName: p.name,
+                role: p.role,
+                teamId: p.soldToTeamId || '',
+                teamName: team?.name || 'Franchise Team',
+                soldPrice: p.soldPrice || 0,
+                committeeCharge: 0,
+                isIcon: false,
+              });
+              needsSave = true;
+            }
+          });
 
           if (parsed.settings) {
             if (parsed.settings.maxVillageLimit !== undefined) {
@@ -115,10 +185,63 @@ class AuctionDatabase {
   private saveToDisk() {
     try {
       this.ensureDataDir();
-      fs.writeFileSync(DB_FILE, JSON.stringify(this.state, null, 2), 'utf-8');
+      const content = JSON.stringify(this.state, null, 2);
+      fs.writeFileSync(DB_FILE, content, 'utf-8');
+      fs.writeFileSync(KPL_DB_FILE, content, 'utf-8');
+      try {
+        fs.writeFileSync(ROOT_KPL_FILE, content, 'utf-8');
+      } catch {
+        // ignore root permission issues if any
+      }
+
+      // Automatically generate and write standalone offline HTML file
+      try {
+        const html = generateStandaloneAuctionHTML(this.state);
+        fs.writeFileSync(path.join(DATA_DIR, 'myauctionkpl.html'), html, 'utf-8');
+        fs.writeFileSync(path.join(process.cwd(), 'myauctionkpl.html'), html, 'utf-8');
+        const pubDir = path.join(process.cwd(), 'public');
+        if (fs.existsSync(pubDir)) {
+          fs.writeFileSync(path.join(pubDir, 'myauctionkpl.html'), html, 'utf-8');
+          fs.writeFileSync(path.join(pubDir, 'cricket_auction_report.html'), html, 'utf-8');
+        }
+        const distDir = path.join(process.cwd(), 'dist');
+        if (fs.existsSync(distDir)) {
+          fs.writeFileSync(path.join(distDir, 'myauctionkpl.html'), html, 'utf-8');
+          fs.writeFileSync(path.join(distDir, 'cricket_auction_report.html'), html, 'utf-8');
+        }
+      } catch (htmlErr) {
+        console.error('Failed to write standalone HTML report:', htmlErr);
+      }
     } catch (err) {
       console.error('Failed to persist database to disk:', err);
     }
+  }
+
+  public saveCustomFile(fileName: string): string {
+    this.ensureDataDir();
+    const cleanName = fileName.replace(/[^a-zA-Z0-9_-]/g, '').trim() || 'myauctionkpl';
+    const filePath = path.join(DATA_DIR, `${cleanName}.json`);
+    const content = JSON.stringify(this.state, null, 2);
+    fs.writeFileSync(filePath, content, 'utf-8');
+    if (cleanName.toLowerCase() === 'myauctionkpl') {
+      try {
+        fs.writeFileSync(ROOT_KPL_FILE, content, 'utf-8');
+      } catch {}
+    }
+
+    try {
+      const html = generateStandaloneAuctionHTML(this.state);
+      fs.writeFileSync(path.join(DATA_DIR, `${cleanName}.html`), html, 'utf-8');
+      fs.writeFileSync(path.join(process.cwd(), `${cleanName}.html`), html, 'utf-8');
+      const pubDir = path.join(process.cwd(), 'public');
+      if (fs.existsSync(pubDir)) {
+        fs.writeFileSync(path.join(pubDir, `${cleanName}.html`), html, 'utf-8');
+      }
+    } catch (htmlErr) {
+      console.error('Failed to write custom HTML report:', htmlErr);
+    }
+
+    return `${cleanName}.json`;
   }
 
   public createOfficialState(): FullAuctionState {
@@ -126,7 +249,7 @@ class AuctionDatabase {
     const livePlayer = players.find(p => p.status === 'AVAILABLE') || players[0];
 
     const bidding: LiveBiddingState = {
-      currentPlayerId: livePlayer ? livePlayer.id : 1,
+      currentPlayerId: livePlayer ? livePlayer.id : 0,
       currentBid: DEFAULT_SETTINGS.defaultReservePrice || 500,
       selectedTeamId: teams[0] ? teams[0].id : null,
       isActive: false,
@@ -152,10 +275,10 @@ class AuctionDatabase {
     const firstAvailable = players.find(p => p.status === 'AVAILABLE') || players[0];
 
     const bidding: LiveBiddingState = {
-      currentPlayerId: firstAvailable ? firstAvailable.id : 1,
+      currentPlayerId: firstAvailable ? firstAvailable.id : 0,
       currentBid: DEFAULT_SETTINGS.defaultReservePrice || 500,
       selectedTeamId: teams[0] ? teams[0].id : null,
-      isActive: true,
+      isActive: Boolean(firstAvailable),
       bidHistory: [],
     };
 
@@ -437,7 +560,7 @@ class AuctionDatabase {
 
     const tx: AuctionTransaction = {
       id: `tx-${Date.now()}-${playerId}`,
-      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      timestamp: new Date().toISOString(),
       auctionOrder: this.state.transactions.length + 1,
       playerId: player.id,
       playerName: player.name,
@@ -554,6 +677,10 @@ class AuctionDatabase {
 
   public addPlayer(newPlayerData: Partial<Player>): { success: boolean; message: string; player?: Player } {
     const nextId = Math.max(...this.state.players.map(p => p.id), 0) + 1;
+    const nextSrNo = typeof newPlayerData.srNo === 'number' && newPlayerData.srNo > 0
+      ? newPlayerData.srNo
+      : (Math.max(...this.state.players.map(p => p.srNo || p.id), 0) + 1);
+
     const player: Player = {
       id: nextId,
       code: `P${nextId.toString().padStart(3, '0')}`,
@@ -564,6 +691,8 @@ class AuctionDatabase {
       soldToTeamId: null,
       soldPrice: 0,
       isIcon: false,
+      srNo: nextSrNo,
+      village: (newPlayerData.village || '').trim(),
     };
 
     this.state.players.push(player);
@@ -579,6 +708,8 @@ class AuctionDatabase {
     if (updates.name) player.name = updates.name.trim().toUpperCase();
     if (updates.role) player.role = updates.role;
     if (typeof updates.auctionOrder === 'number') player.auctionOrder = updates.auctionOrder;
+    if (typeof updates.srNo === 'number') player.srNo = updates.srNo;
+    if (updates.village !== undefined) player.village = updates.village.trim();
     if (updates.status) player.status = updates.status;
 
     this.recalculateAllTeams();
@@ -631,49 +762,160 @@ class AuctionDatabase {
     }
   }
 
-  /**
-   * Bulk CSV import for players
-   */
-  public importPlayersFromCSV(csvText: string, replaceExisting: boolean = false): { count: number; message: string } {
-    const lines = csvText.trim().split(/\r?\n/).filter(line => line.trim().length > 0);
-    if (lines.length === 0) return { count: 0, message: 'CSV is empty' };
+  public clearAllPlayers(): { success: boolean; message: string; state: FullAuctionState } {
+    this.state.players = [];
+    this.state.transactions = [];
+    this.state.bidding.currentPlayerId = 0;
+    this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 500;
+    this.state.bidding.selectedTeamId = this.state.teams[0]?.id || null;
+    this.state.bidding.isActive = false;
+    this.state.bidding.bidHistory = [];
 
-    // Inspect first line for header
+    this.recalculateAllTeams();
+    this.saveToDisk();
+    return { success: true, message: 'All players and auction records erased successfully.', state: this.state };
+  }
+
+  /**
+   * Bulk CSV import for players containing ID, NAME, ROLE, VILLAGE
+   */
+  public importPlayersFromCSV(csvText: string, replaceExisting: boolean = false): { count: number; message: string; state: FullAuctionState } {
+    const lines = csvText.trim().split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length === 0) return { count: 0, message: 'CSV is empty', state: this.state };
+
+    // Function to parse a CSV line with quotes support
+    const parseLine = (line: string): string[] => {
+      const result: string[] = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (c === ',' && !inQuotes) {
+          result.push(cur.trim());
+          cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      result.push(cur.trim());
+      return result;
+    };
+
+    let idCol = -1;
+    let nameCol = -1;
+    let roleCol = -1;
+    let villageCol = -1;
+
     let startIndex = 0;
-    const headerLine = lines[0].toLowerCase();
-    if (headerLine.includes('name') || headerLine.includes('player')) {
+    const firstLineParts = parseLine(lines[0]);
+    const lowerHeaders = firstLineParts.map(p => p.toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+    // Check if the first line is a header
+    const hasHeader = lowerHeaders.some(h =>
+      ['id', 'srno', 'sr', 'name', 'playername', 'player', 'role', 'village', 'city', 'town'].includes(h)
+    );
+
+    if (hasHeader) {
       startIndex = 1;
+      lowerHeaders.forEach((h, idx) => {
+        if (h === 'id' || h === 'srno' || h === 'sr' || h === 'no' || h === 'slno' || h === 'playerid') {
+          idCol = idx;
+        } else if (h.includes('name') || h.includes('player')) {
+          nameCol = idx;
+        } else if (h.includes('role')) {
+          roleCol = idx;
+        } else if (h.includes('village') || h.includes('city') || h.includes('town') || h.includes('location')) {
+          villageCol = idx;
+        }
+      });
     }
 
-    const newPlayers: Array<{ name: string; role: any; status?: string }> = [];
+    // Default column fallback if not detected
+    if (nameCol === -1) {
+      if (firstLineParts.length >= 4) {
+        idCol = 0;
+        nameCol = 1;
+        roleCol = 2;
+        villageCol = 3;
+      } else if (firstLineParts.length === 3) {
+        const firstIsNum = /^\d+$/.test(firstLineParts[0].replace(/\D/g, ''));
+        if (firstIsNum) {
+          idCol = 0;
+          nameCol = 1;
+          roleCol = 2;
+        } else {
+          nameCol = 0;
+          roleCol = 1;
+          villageCol = 2;
+        }
+      } else if (firstLineParts.length === 2) {
+        nameCol = 0;
+        roleCol = 1;
+      } else {
+        nameCol = 0;
+      }
+    }
+
+    const parsedPlayers: Array<{
+      id: number;
+      name: string;
+      role: PlayerRole;
+      village: string;
+    }> = [];
+
+    const existingMaxId = replaceExisting ? 0 : Math.max(...this.state.players.map(p => p.id), 0);
+    let autoIdCounter = existingMaxId + 1;
 
     for (let i = startIndex; i < lines.length; i++) {
-      const line = lines[i];
-      // Split by comma ignoring commas inside quotes
-      const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.replace(/^"|"$/g, '').trim());
-      if (!parts[0]) continue;
+      const parts = parseLine(lines[i]);
+      if (parts.length === 0 || !parts.some(p => p.length > 0)) continue;
 
-      const name = parts[0];
-      let role = 'All-Rounder';
+      const rawName = nameCol >= 0 && parts[nameCol] ? parts[nameCol] : '';
+      if (!rawName.trim()) continue;
 
-      if (parts[1]) {
-        const p1 = parts[1];
-        if (['batsman', 'bowler', 'all-rounder', 'wicket-keeper'].includes(p1.toLowerCase())) {
-          role = p1;
-        } else if (parts[2] && ['batsman', 'bowler', 'all-rounder', 'wicket-keeper'].includes(parts[2].toLowerCase())) {
-          role = parts[2];
+      // Extract ID
+      let customId: number | null = null;
+      if (idCol >= 0 && parts[idCol]) {
+        const numOnly = parts[idCol].replace(/[^0-9]/g, '');
+        if (numOnly) {
+          const parsed = parseInt(numOnly, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            customId = parsed;
+          }
         }
       }
 
-      // Standardize role
-      let standardRole: any = 'All-Rounder';
-      const rLower = role.toLowerCase();
+      const assignedId = customId !== null ? customId : autoIdCounter++;
+
+      // Extract Role
+      let rawRole = roleCol >= 0 && parts[roleCol] ? parts[roleCol] : 'All-Rounder';
+      let standardRole: PlayerRole = 'All-Rounder';
+      const rLower = rawRole.toLowerCase();
       if (rLower.includes('bat')) standardRole = 'Batsman';
       else if (rLower.includes('bowl')) standardRole = 'Bowler';
-      else if (rLower.includes('wick') || rLower.includes('wk')) standardRole = 'Wicket-Keeper';
+      else if (rLower.includes('wick') || rLower.includes('wk') || rLower.includes('keep')) standardRole = 'Wicket-Keeper';
       else standardRole = 'All-Rounder';
 
-      newPlayers.push({ name, role: standardRole });
+      // Extract Village
+      const village = villageCol >= 0 && parts[villageCol] ? parts[villageCol].trim() : '';
+
+      parsedPlayers.push({
+        id: assignedId,
+        name: rawName.trim().toUpperCase(),
+        role: standardRole,
+        village,
+      });
+    }
+
+    if (parsedPlayers.length === 0) {
+      return { count: 0, message: 'No valid player rows found in CSV', state: this.state };
     }
 
     if (replaceExisting) {
@@ -682,31 +924,53 @@ class AuctionDatabase {
     }
 
     let count = 0;
-    newPlayers.forEach(p => {
-      this.addPlayer({
+    parsedPlayers.forEach((p, idx) => {
+      const playerObj: Player = {
+        id: p.id,
+        code: `P${p.id.toString().padStart(3, '0')}`,
         name: p.name,
         role: p.role,
-      });
+        auctionOrder: p.id || (idx + 1),
+        status: 'AVAILABLE',
+        soldToTeamId: null,
+        soldPrice: 0,
+        isIcon: false,
+        srNo: p.id || (idx + 1),
+        village: p.village,
+      };
+      this.state.players.push(playerObj);
       count++;
     });
+
+    // Sort players by id
+    this.state.players.sort((a, b) => a.id - b.id);
 
     if (this.state.players[0]) {
       this.state.bidding.currentPlayerId = this.state.players[0].id;
       this.state.bidding.currentBid = this.state.settings.defaultReservePrice || 500;
+      this.state.bidding.isActive = true;
+    } else {
+      this.state.bidding.currentPlayerId = 0;
+      this.state.bidding.isActive = false;
     }
 
     this.recalculateAllTeams();
     this.saveToDisk();
-    return { count, message: `Successfully imported ${count} players.` };
+    return {
+      count,
+      message: `Successfully imported ${count} players from CSV (ID, Name, Role, Village).`,
+      state: this.state,
+    };
   }
 
-  public importPlayers(list: Array<{ id?: number; name: string; role?: string }>): { count: number } {
+  public importPlayers(list: Array<{ id?: number; name: string; role?: string; village?: string }>): { count: number } {
     let count = 0;
     list.forEach(item => {
       if (item.name) {
         this.addPlayer({
           name: item.name,
           role: (item.role as any) || 'All-Rounder',
+          village: item.village || '',
         });
         count++;
       }

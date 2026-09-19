@@ -13,6 +13,8 @@ export interface Player {
   soldPrice: number;
   isIcon: boolean;
   soldAt?: string;
+  srNo?: number;
+  village?: string;
 }
 
 export interface Team {
