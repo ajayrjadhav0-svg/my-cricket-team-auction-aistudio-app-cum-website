@@ -222,6 +222,16 @@ apiRouter.post('/reset', (req: Request, res: Response) => {
   res.json({ message: `Auction reset to ${targetMode} mode`, state: newState });
 });
 
+// Initialize / Create a brand-new auction event (Admin)
+apiRouter.post('/auction/create-new', (req: Request, res: Response) => {
+  try {
+    const newState = db.createNewAuction(req.body);
+    res.json({ message: 'New auction created successfully', state: newState });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Bulk CSV Import (Players)
 apiRouter.post('/import/csv', (req: Request, res: Response) => {
   const { csvText, replaceExisting } = req.body;

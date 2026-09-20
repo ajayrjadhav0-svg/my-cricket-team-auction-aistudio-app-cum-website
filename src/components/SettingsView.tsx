@@ -5,21 +5,25 @@ import {
   Share2,
   Lock,
   ArrowRight,
+  Trophy,
+  Edit2,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { ActiveNav } from '../types';
 import { formatPoints } from '../utils/formatters';
 import { AdminLoginModal } from './admin/AdminLoginModal';
+import { EditLeagueModal } from './admin/EditLeagueModal';
 
 interface SettingsViewProps {
   onSelectNav?: (nav: ActiveNav) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onSelectNav }) => {
-  const { state, role, logoutAdmin, getViewerShareUrl, showNotification } = useAuction();
+  const { state, role, logoutAdmin, getViewerShareUrl, showNotification, updateSettings } = useAuction();
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isEditLeagueOpen, setIsEditLeagueOpen] = useState(false);
 
   if (!state) {
     return <div className="p-8 text-slate-400">Loading settings...</div>;
@@ -57,6 +61,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onSelectNav }) => {
           <Share2 className="w-3.5 h-3.5 text-indigo-400" />
           <span>{copiedLink ? 'Link Copied!' : 'Copy Viewer Link'}</span>
         </button>
+      </div>
+
+      {/* LEAGUE BRANDING & LOGO CARD */}
+      <div className="p-5 md:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-xs">
+            {settings.tournamentLogo ? (
+              <img
+                src={settings.tournamentLogo}
+                alt="League Logo"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span className="text-3xl">🏆</span>
+            )}
+          </div>
+          <div>
+            <span className="text-[10px] text-indigo-600 block font-black uppercase tracking-wider">
+              Official League Branding
+            </span>
+            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">
+              {settings.tournamentName}
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Official emblem displayed on header, broadcast desk, and player registration portal.
+            </p>
+          </div>
+        </div>
+
+        {role === 'admin' ? (
+          <button
+            id="btn-settings-edit-branding"
+            onClick={() => setIsEditLeagueOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-['Outfit'] font-bold text-xs flex items-center gap-2 shadow-xs transition-all self-start sm:self-auto shrink-0"
+          >
+            <Trophy className="w-4 h-4 text-amber-300" />
+            <span>Edit League & Logo</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setIsLoginModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all self-start sm:self-auto shrink-0"
+          >
+            <Lock className="w-3.5 h-3.5 text-slate-400" />
+            <span>Admin to Edit Branding</span>
+          </button>
+        )}
       </div>
 
       {/* RULES SPECIFICATION CARD */}
@@ -177,6 +228,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onSelectNav }) => {
         onClose={() => setIsLoginModalOpen(false)}
         onSuccess={() => {
           if (onSelectNav) onSelectNav('admin');
+        }}
+      />
+
+      <EditLeagueModal
+        isOpen={isEditLeagueOpen}
+        currentName={settings.tournamentName}
+        currentLogo={settings.tournamentLogo}
+        onClose={() => setIsEditLeagueOpen(false)}
+        onSave={async (name, logo) => {
+          await updateSettings({
+            tournamentName: name,
+            tournamentLogo: logo,
+          });
+          showNotification('success', `League branding updated to "${name}"!`);
         }}
       />
     </div>

@@ -5,6 +5,7 @@ import {
   Team,
   TournamentSettings,
   UserRole,
+  CreateNewAuctionConfig,
 } from '../types';
 import { DEFAULT_AUCTION_STATE } from '../data/defaultAuctionState';
 import {
@@ -18,6 +19,7 @@ import {
   clientDeletePlayer,
   clientUpdateSettings,
   clientResetAuction,
+  clientCreateNewAuction,
   recalculateAllTeams,
 } from '../utils/clientAuctionEngine';
 
@@ -52,6 +54,7 @@ interface AuctionContextType {
   updateTeam: (id: string, team: Partial<Team>) => Promise<boolean>;
   deleteTeam: (id: string) => Promise<boolean>;
   resetAuction: (mode: 'official' | 'pre-auction' | 'clear' | 'clear-players') => Promise<void>;
+  createNewAuction: (config: CreateNewAuctionConfig) => Promise<boolean>;
   clearAllPlayers: () => Promise<boolean>;
   importPlayers: (players: any[]) => Promise<number>;
   importCSV: (csvText: string, replaceExisting?: boolean) => Promise<{ count: number; message: string } | null>;
@@ -588,6 +591,32 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch {}
   };
 
+  const createNewAuction = async (config: CreateNewAuctionConfig): Promise<boolean> => {
+    // 1. Compute new atomic state client-side immediately
+    const nextState = clientCreateNewAuction(stateRef.current, config);
+    updateStateAndPersist(nextState);
+    showNotification('success', `New auction "${config.tournamentName}" created successfully!`);
+
+    // 2. Persist to server if available
+    try {
+      const res = await fetch('/api/auction/create-new', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.state) {
+          updateStateAndPersist(data.state);
+        }
+      }
+    } catch {
+      // Client mode operates standalone
+    }
+
+    return true;
+  };
+
   const clearAllPlayers = async (): Promise<boolean> => {
     try {
       await fetch('/api/players/clear', { method: 'POST' });
@@ -878,6 +907,7 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateTeam,
         deleteTeam,
         resetAuction,
+        createNewAuction,
         clearAllPlayers,
         importPlayers,
         importCSV,

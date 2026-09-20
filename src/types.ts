@@ -62,6 +62,7 @@ export type UserRole = 'admin' | 'viewer';
 
 export interface TournamentSettings {
   tournamentName: string;
+  tournamentLogo?: string;
   maxSquadSize: number;
   maxAuctionPlayers: number;
   iconPlayersCount: number;
@@ -105,3 +106,23 @@ export type ActiveNav =
   | 'admin'
   | 'settings'
   | 'register';
+
+export type PlayerPoolResetMode = 'reset-available' | 'empty' | 'demo' | 'keep-current';
+
+export interface CreateNewAuctionConfig {
+  tournamentName: string;
+  tournamentLogo?: string;
+  startingPoints: number;
+  maxSquadSize: number;
+  defaultReservePrice: number;
+  minBidIncrement?: number;
+  teams: Array<{
+    id?: string;
+    name: string;
+    shortCode: string;
+    color: string;
+    badgeBg?: string;
+    badgeText?: string;
+  }>;
+  playerPoolMode: PlayerPoolResetMode;
+}

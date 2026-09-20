@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Sparkles,
   Users,
@@ -12,23 +12,31 @@ import {
   Settings,
   Sliders,
   CheckCircle2,
+  Trophy,
+  Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { Team, TournamentSettings } from '../../types';
 import { formatPoints } from '../../utils/formatters';
 import { PRESET_20_TEAMS } from '../../utils/teamPresets';
+import { PRESET_LEAGUE_EMBLEMS } from './EditLeagueModal';
 
 interface SetNewAuctionModalProps {
   isOpen: boolean;
   currentSettings: TournamentSettings;
   teams: Team[];
+  playerCount?: number;
   onClose: () => void;
   onLaunchNewAuction: (config: {
     tournamentName: string;
+    tournamentLogo?: string;
     startingPoints: number;
     maxSquadSize: number;
+    defaultReservePrice: number;
+    minBidIncrement: number;
     targetTeamCount: number;
-    resetMode: 'pre-auction' | 'official' | 'none';
-    customTeams?: Array<{ id?: string; name: string; short: string; color: string }>;
+    resetMode: 'reset-available' | 'empty' | 'demo' | 'keep-current';
+    customTeams: Array<{ id?: string; name: string; shortCode: string; color: string }>;
   }) => Promise<void>;
   onOpenAddPlayer?: () => void;
   onOpenCsvUpload?: () => void;
@@ -38,6 +46,7 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
   isOpen,
   currentSettings,
   teams,
+  playerCount = 0,
   onClose,
   onLaunchNewAuction,
   onOpenAddPlayer,
@@ -48,9 +57,12 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
   // Wizard tab
   const [wizardTab, setWizardTab] = useState<'tournament' | 'teams' | 'players'>('tournament');
 
-  // Step 1: Tournament & Quotas
+  // Step 1: Tournament & Quotas & Branding
   const [tournamentName, setTournamentName] = useState(
     currentSettings.tournamentName || 'Premier Cricket League 2026'
+  );
+  const [tournamentLogo, setTournamentLogo] = useState<string>(
+    currentSettings.tournamentLogo || ''
   );
   const [startingPoints, setStartingPoints] = useState(currentSettings.startingPoints || 100000);
   const [maxSquadSize, setMaxSquadSize] = useState(currentSettings.maxSquadSize || 15);
@@ -58,16 +70,30 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
   const [defaultReservePrice, setDefaultReservePrice] = useState(
     currentSettings.defaultReservePrice || 500
   );
-  const [resetMode, setResetMode] = useState<'pre-auction' | 'official' | 'none'>('pre-auction');
+  const [resetMode, setResetMode] = useState<'reset-available' | 'empty' | 'demo' | 'keep-current'>('reset-available');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (typeof ev.target?.result === 'string') {
+        setTournamentLogo(ev.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Step 2: Teams Configuration
   const [targetTeamCount, setTargetTeamCount] = useState<number>(teams.length || 6);
-  const [teamList, setTeamList] = useState<Array<{ id: string; name: string; short: string; color: string }>>(() => {
+  const [teamList, setTeamList] = useState<Array<{ id: string; name: string; shortCode: string; color: string }>>(() => {
     return teams.map((t) => ({
       id: t.id,
       name: t.name,
-      short: t.short,
-      color: t.color,
+      shortCode: t.shortCode || (t as any).short || t.name.slice(0, 3).toUpperCase(),
+      color: t.color || '#4f46e5',
     }));
   });
 
@@ -87,7 +113,7 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
         additions.push({
           id: `T${teamIndex + 1}`,
           name: teamIndex < PRESET_20_TEAMS.length ? p.name : `${p.name} ${teamIndex + 1}`,
-          short: teamIndex < PRESET_20_TEAMS.length ? p.short : `${p.short}${teamIndex + 1}`,
+          shortCode: teamIndex < PRESET_20_TEAMS.length ? p.short : `${p.short}${teamIndex + 1}`,
           color: p.color,
         });
       }
@@ -100,8 +126,8 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
   const handleTeamNameChange = (index: number, newName: string) => {
     const updated = [...teamList];
     updated[index].name = newName;
-    if (!updated[index].short || updated[index].short.length <= 3) {
-      updated[index].short = newName.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
+    if (!updated[index].shortCode || updated[index].shortCode.length <= 3) {
+      updated[index].shortCode = newName.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
     }
     setTeamList(updated);
   };
@@ -114,15 +140,26 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tournamentName.trim()) {
+      return;
+    }
     setIsSubmitting(true);
     try {
       await onLaunchNewAuction({
-        tournamentName,
-        startingPoints: Number(startingPoints),
-        maxSquadSize: Number(maxSquadSize),
+        tournamentName: tournamentName.trim(),
+        tournamentLogo: tournamentLogo.trim() || undefined,
+        startingPoints: Math.max(1000, Number(startingPoints) || 100000),
+        maxSquadSize: Math.max(5, Number(maxSquadSize) || 15),
+        defaultReservePrice: Math.max(100, Number(defaultReservePrice) || 500),
+        minBidIncrement: 500,
         targetTeamCount: Number(targetTeamCount),
         resetMode,
-        customTeams: teamList,
+        customTeams: teamList.map((t, idx) => ({
+          id: t.id,
+          name: t.name.trim() || `Team ${idx + 1}`,
+          shortCode: (t.shortCode || t.name.slice(0, 3)).trim().toUpperCase(),
+          color: t.color || '#4f46e5',
+        })),
       });
       onClose();
     } finally {
@@ -216,6 +253,80 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-bold text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                   required
                 />
+              </div>
+
+              {/* Tournament / League Logo */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    League Logo / Official Emblem
+                  </label>
+                  {tournamentLogo && (
+                    <button
+                      type="button"
+                      onClick={() => setTournamentLogo('')}
+                      className="text-[11px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* Current Preview */}
+                  <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                    {tournamentLogo ? (
+                      <img
+                        src={tournamentLogo}
+                        alt="Logo Preview"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-xl">🏏</span>
+                    )}
+                  </div>
+
+                  {/* Preset Emblem Quick Selector */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 flex-1">
+                    {PRESET_LEAGUE_EMBLEMS.map((emblem) => (
+                      <button
+                        key={emblem.id}
+                        type="button"
+                        onClick={() => setTournamentLogo(emblem.dataUri)}
+                        title={emblem.label}
+                        className={`w-9 h-9 rounded-xl border p-1 shrink-0 transition-all flex items-center justify-center ${
+                          tournamentLogo === emblem.dataUri
+                            ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-500/20 shadow-2xs'
+                            : 'border-slate-200 bg-white hover:bg-slate-100'
+                        }`}
+                      >
+                        <img
+                          src={emblem.dataUri}
+                          alt={emblem.label}
+                          className="w-full h-full object-contain"
+                        />
+                      </button>
+                    ))}
+
+                    {/* Upload File button */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-2.5 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-[11px] font-bold text-slate-700 shrink-0 flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Upload</span>
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Starting Points Purse */}
@@ -393,10 +504,10 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
                       <input
                         type="text"
                         maxLength={4}
-                        value={team.short}
+                        value={team.shortCode}
                         onChange={(e) => {
                           const updated = [...teamList];
-                          updated[idx].short = e.target.value.toUpperCase();
+                          updated[idx].shortCode = e.target.value.toUpperCase();
                           setTeamList(updated);
                         }}
                         placeholder="CODE"
@@ -473,70 +584,119 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
 
               {/* Auction State & Bidding Mode */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Select Auction Session Initialization Mode
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Select Auction Session Initialization Mode
+                  </label>
+                  <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                    {playerCount} Players in Pool
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <label
                     className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between text-xs transition-all ${
-                      resetMode === 'pre-auction'
-                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 font-semibold shadow-2xs'
+                      resetMode === 'reset-available'
+                        ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 font-semibold shadow-xs ring-1 ring-indigo-500'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>Fresh Pre-Auction</span>
+                      </span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                        Recommended
+                      </span>
+                    </div>
                     <input
                       type="radio"
                       name="resetMode"
-                      value="pre-auction"
-                      checked={resetMode === 'pre-auction'}
-                      onChange={() => setResetMode('pre-auction')}
+                      value="reset-available"
+                      checked={resetMode === 'reset-available'}
+                      onChange={() => setResetMode('reset-available')}
                       className="sr-only"
                     />
-                    <span className="font-bold text-slate-900">Fresh Pre-Auction</span>
-                    <span className="text-[10px] text-slate-500 mt-1">
-                      Reset all bids to 0. All players AVAILABLE. Full purses restored.
+                    <span className="text-[11px] text-slate-600">
+                      Keep {playerCount} registered players. Reset all bids & sales to 0 (all AVAILABLE). Restore full starting purse ({startingPoints.toLocaleString()} pts) for all {targetTeamCount} teams.
                     </span>
                   </label>
 
                   <label
                     className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between text-xs transition-all ${
-                      resetMode === 'none'
-                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 font-semibold shadow-2xs'
+                      resetMode === 'empty'
+                        ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 font-semibold shadow-xs ring-1 ring-indigo-500'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <UserPlus className="w-4 h-4 text-slate-600 shrink-0" />
+                        <span>Blank Slate (Empty Pool)</span>
+                      </span>
+                    </div>
                     <input
                       type="radio"
                       name="resetMode"
-                      value="none"
-                      checked={resetMode === 'none'}
-                      onChange={() => setResetMode('none')}
+                      value="empty"
+                      checked={resetMode === 'empty'}
+                      onChange={() => setResetMode('empty')}
                       className="sr-only"
                     />
-                    <span className="font-bold text-slate-900">Keep Current Sales</span>
-                    <span className="text-[10px] text-slate-500 mt-1">
-                      Update rules & franchise titles without modifying existing sales.
+                    <span className="text-[11px] text-slate-600">
+                      Clear all players to 0. Start totally clean with new teams and purses ready for a new CSV roster upload or registrations.
                     </span>
                   </label>
 
                   <label
                     className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between text-xs transition-all ${
-                      resetMode === 'official'
-                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 font-semibold shadow-2xs'
+                      resetMode === 'keep-current'
+                        ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 font-semibold shadow-xs ring-1 ring-indigo-500'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Keep Current Sales</span>
+                      </span>
+                    </div>
                     <input
                       type="radio"
                       name="resetMode"
-                      value="official"
-                      checked={resetMode === 'official'}
-                      onChange={() => setResetMode('official')}
+                      value="keep-current"
+                      checked={resetMode === 'keep-current'}
+                      onChange={() => setResetMode('keep-current')}
                       className="sr-only"
                     />
-                    <span className="font-bold text-slate-900">Demo Sample Season</span>
-                    <span className="text-[10px] text-slate-500 mt-1">
-                      Load a populated sample tournament with completed transactions.
+                    <span className="text-[11px] text-slate-600">
+                      Update rules & franchise titles without modifying existing player assignments, prices, or team transactions.
+                    </span>
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between text-xs transition-all ${
+                      resetMode === 'demo'
+                        ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 font-semibold shadow-xs ring-1 ring-indigo-500'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+                        <span>Demo Sample Season</span>
+                      </span>
+                    </div>
+                    <input
+                      type="radio"
+                      name="resetMode"
+                      value="demo"
+                      checked={resetMode === 'demo'}
+                      onChange={() => setResetMode('demo')}
+                      className="sr-only"
+                    />
+                    <span className="text-[11px] text-slate-600">
+                      Load a populated sample tournament with pre-assigned squad sales and bidding transactions for test demonstrations.
                     </span>
                   </label>
                 </div>

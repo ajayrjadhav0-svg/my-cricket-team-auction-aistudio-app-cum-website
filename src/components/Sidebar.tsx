@@ -61,17 +61,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Tournament Brand Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center shadow-md shadow-indigo-500/20 text-white font-black font-['Outfit'] text-xl">
-              🏏
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center shadow-md shadow-indigo-500/20 text-white font-black font-['Outfit'] text-xl shrink-0 overflow-hidden p-1">
+              {state?.settings?.tournamentLogo ? (
+                <img
+                  src={state.settings.tournamentLogo}
+                  alt={state.settings.tournamentName || 'League Logo'}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <span>🏏</span>
+              )}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <h1 className="font-['Outfit'] font-extrabold text-base text-slate-900 tracking-tight leading-tight">
+                <h1 className="font-['Outfit'] font-extrabold text-base text-slate-900 tracking-tight leading-tight truncate" title={state?.settings?.tournamentName}>
                   {state?.settings?.tournamentName || 'CRICKET LEAGUE'}
                 </h1>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">Live Auction Command</p>
+              <p className="text-[11px] text-slate-500 font-medium truncate">Live Auction Command</p>
             </div>
           </div>
 

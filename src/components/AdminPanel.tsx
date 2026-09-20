@@ -39,6 +39,7 @@ import { AddNewPlayerModal } from './admin/AddNewPlayerModal';
 import { CsvUploadModal } from './admin/CsvUploadModal';
 import { AdminAccessGate } from './admin/AdminAccessGate';
 import { AuctionExportModal } from './AuctionExportModal';
+import { EditLeagueModal } from './admin/EditLeagueModal';
 import { PRESET_20_TEAMS } from '../utils/teamPresets';
 
 interface AdminPanelProps {
@@ -59,6 +60,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
     markUnsold,
     reopenPlayer,
     resetAuction,
+    createNewAuction,
     clearAllPlayers,
     importCSV,
     getViewerShareUrl,
@@ -85,6 +87,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
   // Modals state
   const [isConfirmSaleOpen, setIsConfirmSaleOpen] = useState(false);
   const [isSetNewAuctionOpen, setIsSetNewAuctionOpen] = useState(false);
+  const [isEditLeagueOpen, setIsEditLeagueOpen] = useState(false);
   const [isAddNewPlayerOpen, setIsAddNewPlayerOpen] = useState(false);
   const [isCsvUploadOpen, setIsCsvUploadOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -344,23 +347,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
       {/* QUICK STATUS BAR & STAGE SHORTCUT */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white px-5 py-3.5 rounded-2xl border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
-            <Gavel className="w-4 h-4" />
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+            {state.settings.tournamentLogo ? (
+              <img
+                src={state.settings.tournamentLogo}
+                alt="League Logo"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span className="text-xl">🏆</span>
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <h1 className="font-['Outfit'] font-black text-lg text-slate-900 tracking-tight">
-                Live Auction Desk & Hammer Console
+                {state.settings.tournamentName || 'Cricket League Auction'}
               </h1>
             </div>
             <p className="text-[11px] text-slate-500">
-              {state.settings.tournamentName || 'Cricket League Auction'} • Real-time hammer control
+              Live Auction Desk & Hammer Console • Real-time hammer control
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            id="btn-top-edit-league-branding"
+            onClick={() => setIsEditLeagueOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 font-['Outfit'] font-bold text-xs shadow-2xs flex items-center gap-1.5 transition-colors"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+            <span>League Name & Logo</span>
+          </button>
           <button
             onClick={() => onSelectNav('live-auction')}
             className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs shadow-2xs flex items-center gap-1.5 transition-colors"
@@ -1143,22 +1162,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
       {/* ========================================================================= */}
       <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[11px] font-black uppercase tracking-widest text-indigo-600">
-                ADMIN AUCTION DIRECTOR
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                TOURNAMENT CONTROLS & SQUAD CONFIGURATION
-              </span>
+          <div className="flex items-center gap-3.5">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+              {state.settings.tournamentLogo ? (
+                <img
+                  src={state.settings.tournamentLogo}
+                  alt="League Logo"
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <span className="text-2xl">🏆</span>
+              )}
             </div>
-            <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 tracking-tight">
-              {state.settings.tournamentName || 'My Cricket League Auction'}
-            </h2>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-indigo-600">
+                  ADMIN AUCTION DIRECTOR
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  TOURNAMENT CONTROLS & SQUAD CONFIGURATION
+                </span>
+              </div>
+              <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 tracking-tight">
+                {state.settings.tournamentName || 'My Cricket League Auction'}
+              </h2>
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Edit League Branding */}
+            <button
+              id="btn-admin-edit-league-branding"
+              onClick={() => setIsEditLeagueOpen(true)}
+              className="px-3.5 py-2.5 rounded-2xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-['Outfit'] font-bold text-xs shadow-2xs flex items-center gap-2 transition-all"
+            >
+              <Trophy className="w-4 h-4 text-amber-500" />
+              <span>Edit League & Logo</span>
+            </button>
+
             {/* Set New Auction Button */}
             <button
               id="btn-admin-set-new-auction"
@@ -1442,38 +1484,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
         isOpen={isSetNewAuctionOpen}
         currentSettings={state.settings}
         teams={state.teams}
+        playerCount={state.players.length}
         onClose={() => setIsSetNewAuctionOpen(false)}
         onOpenAddPlayer={() => setIsAddNewPlayerOpen(true)}
         onOpenCsvUpload={() => setIsCsvUploadOpen(true)}
-        onLaunchNewAuction={async ({ tournamentName, startingPoints, maxSquadSize, targetTeamCount, resetMode, customTeams }) => {
-          // 1. update settings
-          await updateSettings({
+        onLaunchNewAuction={async ({ tournamentName, tournamentLogo, startingPoints, maxSquadSize, defaultReservePrice, minBidIncrement, resetMode, customTeams }) => {
+          await createNewAuction({
             tournamentName,
+            tournamentLogo,
             startingPoints,
-            auctionBudget: startingPoints,
             maxSquadSize,
-            maxAuctionPlayers: maxSquadSize - (state.settings.iconPlayersCount || 2),
+            defaultReservePrice,
+            minBidIncrement,
+            playerPoolMode: resetMode,
+            teams: customTeams,
           });
-
-          // 2. adjust team count and customize teams if provided
-          if (customTeams && customTeams.length > 0) {
-            for (const ct of customTeams) {
-              if (ct.id && state.teams.some((t) => t.id === ct.id)) {
-                await updateTeam(ct.id, { name: ct.name, short: ct.short, color: ct.color });
-              }
-            }
-          }
-          if (targetTeamCount !== state.teams.length) {
-            await handleSetTeamCount(targetTeamCount);
-          }
-
-          // 3. execute reset mode if selected
-          if (resetMode === 'pre-auction') {
-            await resetAuction('pre-auction');
-          } else if (resetMode === 'official') {
-            await resetAuction('official');
-          }
-          showNotification('success', 'New auction parameters launched successfully!');
         }}
       />
 
@@ -1548,6 +1573,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
       <AuctionExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
+      />
+
+      {/* 8. Edit League Name & Logo Modal */}
+      <EditLeagueModal
+        isOpen={isEditLeagueOpen}
+        currentName={state.settings.tournamentName}
+        currentLogo={state.settings.tournamentLogo}
+        onClose={() => setIsEditLeagueOpen(false)}
+        onSave={async (name, logo) => {
+          await updateSettings({
+            tournamentName: name,
+            tournamentLogo: logo,
+          });
+          showNotification('success', `League branding updated to "${name}"!`);
+        }}
       />
     </div>
   );

@@ -61,6 +61,7 @@ export interface LiveBiddingState {
 
 export interface TournamentSettings {
   tournamentName: string;
+  tournamentLogo?: string;
   maxSquadSize: number;
   maxAuctionPlayers: number;
   iconPlayersCount: number;

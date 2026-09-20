@@ -78,19 +78,30 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-['Outfit'] font-black text-indigo-600 uppercase tracking-wider">
-              {state?.settings?.tournamentName || 'MY CRICKET LEAGUE AUCTION'}
-            </span>
-            <span className="text-slate-300">•</span>
-            <h2 className="font-['Outfit'] font-extrabold text-base md:text-lg text-slate-900 tracking-tight truncate">
-              {navTitles[activeNav]}
-            </h2>
+        <div className="flex items-center gap-2.5">
+          {state?.settings?.tournamentLogo && (
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center p-0.5 overflow-hidden shrink-0 shadow-2xs">
+              <img
+                src={state.settings.tournamentLogo}
+                alt="League Logo"
+                className="w-full h-full object-contain"
+              />
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-['Outfit'] font-black text-indigo-600 uppercase tracking-wider truncate max-w-[200px] sm:max-w-none">
+                {state?.settings?.tournamentName || 'MY CRICKET LEAGUE AUCTION'}
+              </span>
+              <span className="text-slate-300">•</span>
+              <h2 className="font-['Outfit'] font-extrabold text-base md:text-lg text-slate-900 tracking-tight truncate">
+                {navTitles[activeNav]}
+              </h2>
+            </div>
+            <p className="text-[11px] text-slate-500 hidden sm:block">
+              {state?.teams?.length || 0} Teams • {state?.players?.length || 0} Registered Players • {formatINR(state?.settings?.startingPoints || 100000)} Points Purse
+            </p>
           </div>
-          <p className="text-[11px] text-slate-500 hidden sm:block">
-            {state?.teams?.length || 0} Teams • {state?.players?.length || 0} Registered Players • {formatINR(state?.settings?.startingPoints || 100000)} Points Purse
-          </p>
         </div>
       </div>
 

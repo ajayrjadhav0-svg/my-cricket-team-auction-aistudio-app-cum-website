@@ -6,6 +6,7 @@ import {
   AuctionTransaction,
   DashboardSummary,
   LiveBiddingState,
+  CreateNewAuctionConfig,
 } from '../types';
 import { DEFAULT_AUCTION_STATE } from '../data/defaultAuctionState';
 
@@ -444,16 +445,18 @@ export function clientResetAuction(
   state: FullAuctionState,
   mode: 'official' | 'pre-auction' | 'clear'
 ): FullAuctionState {
-  if (mode === 'clear') {
+  if (mode === 'clear' || mode === 'pre-auction') {
     const clearedPlayers = state.players.map((p) => ({
       ...p,
       status: 'AVAILABLE' as const,
       soldToTeamId: null,
       soldPrice: 0,
       soldAt: undefined,
+      isIcon: false,
     }));
 
     const { updatedTeams, summary } = recalculateAllTeams(state.teams, clearedPlayers, state.settings);
+    const firstAvailable = clearedPlayers.find((p) => p.status === 'AVAILABLE') || clearedPlayers[0];
 
     return {
       ...state,
@@ -461,17 +464,17 @@ export function clientResetAuction(
       teams: updatedTeams,
       transactions: [],
       bidding: {
-        currentPlayerId: clearedPlayers[0]?.id || 1,
+        currentPlayerId: firstAvailable ? firstAvailable.id : 0,
         currentBid: state.settings.defaultReservePrice || 500,
-        selectedTeamId: null,
-        isActive: false,
+        selectedTeamId: updatedTeams[0]?.id || null,
+        isActive: Boolean(firstAvailable),
         bidHistory: [],
       },
       summary,
     };
   }
 
-  // pre-auction or official reset
+  // official reset: load sample tournament demo data
   return {
     ...DEFAULT_AUCTION_STATE,
     settings: {
@@ -480,3 +483,108 @@ export function clientResetAuction(
     },
   };
 }
+
+export function clientCreateNewAuction(
+  state: FullAuctionState,
+  config: CreateNewAuctionConfig
+): FullAuctionState {
+  const updatedSettings: TournamentSettings = {
+    ...state.settings,
+    tournamentName: (config.tournamentName || state.settings.tournamentName || 'Cricket League Auction').trim(),
+    tournamentLogo: config.tournamentLogo !== undefined ? config.tournamentLogo : state.settings.tournamentLogo,
+    startingPoints: config.startingPoints > 0 ? Number(config.startingPoints) : 100000,
+    auctionBudget: config.startingPoints > 0 ? Number(config.startingPoints) : 100000,
+    maxSquadSize: config.maxSquadSize > 0 ? Number(config.maxSquadSize) : 15,
+    maxAuctionPlayers: config.maxSquadSize > 0 ? Number(config.maxSquadSize) : 15,
+    iconPlayersCount: 0,
+    iconCostPerPlayer: 0,
+    defaultReservePrice: config.defaultReservePrice > 0 ? Number(config.defaultReservePrice) : 500,
+    minBidIncrement: config.minBidIncrement ? Number(config.minBidIncrement) : (state.settings.minBidIncrement || 500),
+    freePoints: 0,
+    extraPointsAllowed: true,
+    extraPointsPenaltyRate: 1,
+  };
+
+  // Build new teams with full purse
+  const incomingTeams = config.teams && config.teams.length > 0 ? config.teams : state.teams;
+  const newTeams: Team[] = incomingTeams.map((t, idx) => {
+    const rawName = (t.name || `FRANCHISE ${idx + 1}`).trim().toUpperCase();
+    const rawShort = (t.shortCode || (t as any).short || rawName.slice(0, 3)).trim().toUpperCase();
+    const cleanId = t.id && t.id.trim()
+      ? t.id
+      : rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `team-${idx + 1}`;
+    const color = t.color || '#4f46e5';
+    const startingPoints = updatedSettings.startingPoints;
+    const auctionBudget = startingPoints;
+    const maxSafeBid = Math.max(0, startingPoints - ((updatedSettings.maxSquadSize - 1) * updatedSettings.minBidIncrement));
+
+    return {
+      id: cleanId,
+      name: rawName,
+      shortCode: rawShort,
+      color,
+      badgeBg: t.badgeBg || '#e0e7ff',
+      badgeText: t.badgeText || '#3730a3',
+      startingPoints,
+      iconCost: 0,
+      auctionBudget,
+      totalPlayers: 0,
+      iconPlayersCount: 0,
+      auctionPlayersCount: 0,
+      totalPointsSpent: 0,
+      pointsRemaining: startingPoints,
+      maxSafeBid,
+      committeeCash: 0,
+      status: 'OK' as const,
+    };
+  });
+
+  // Handle players based on playerPoolMode
+  let newPlayers: Player[] = [];
+  let newTransactions: AuctionTransaction[] = [];
+
+  if (config.playerPoolMode === 'empty') {
+    newPlayers = [];
+    newTransactions = [];
+  } else if (config.playerPoolMode === 'demo') {
+    newPlayers = DEFAULT_AUCTION_STATE.players.map((p) => ({ ...p }));
+    newTransactions = DEFAULT_AUCTION_STATE.transactions.map((t) => ({ ...t }));
+  } else if (config.playerPoolMode === 'keep-current') {
+    newPlayers = state.players.map((p) => ({ ...p }));
+    newTransactions = (state.transactions || []).map((t) => ({ ...t }));
+  } else {
+    // Default: 'reset-available' (Fresh Pre-Auction with existing player roster)
+    newPlayers = state.players.map((p) => ({
+      ...p,
+      status: 'AVAILABLE' as const,
+      soldToTeamId: null,
+      soldPrice: 0,
+      soldAt: undefined,
+      isIcon: false,
+    }));
+    newTransactions = [];
+  }
+
+  // Recalculate all teams to update budget math, status, and summary
+  const { updatedTeams, summary } = recalculateAllTeams(newTeams, newPlayers, updatedSettings);
+
+  const firstAvailable = newPlayers.find((p) => p.status === 'AVAILABLE') || newPlayers[0];
+
+  const nextBidding: LiveBiddingState = {
+    currentPlayerId: firstAvailable ? firstAvailable.id : 0,
+    currentBid: updatedSettings.defaultReservePrice,
+    selectedTeamId: updatedTeams[0]?.id || null,
+    isActive: Boolean(firstAvailable),
+    bidHistory: [],
+  };
+
+  return {
+    settings: updatedSettings,
+    teams: updatedTeams,
+    players: newPlayers,
+    transactions: newTransactions,
+    bidding: nextBidding,
+    summary,
+  };
+}
+

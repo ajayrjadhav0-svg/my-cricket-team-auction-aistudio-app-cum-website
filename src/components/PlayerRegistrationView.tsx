@@ -213,17 +213,28 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 p-5 sm:p-8 text-white shadow-xl">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 rounded-full bg-indigo-600/20 blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Official Player Registration</span>
+          <div className="flex items-center gap-4 max-w-2xl">
+            {state?.settings?.tournamentLogo && (
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center p-1.5 overflow-hidden shrink-0 shadow-lg">
+                <img
+                  src={state.settings.tournamentLogo}
+                  alt="League Logo"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Official Player Registration</span>
+              </div>
+              <h1 className="font-['Outfit'] font-black text-2xl sm:text-3xl lg:text-4xl tracking-tight text-white">
+                {state?.settings?.tournamentName || 'CRICKET LEAGUE AUCTION'}
+              </h1>
+              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                Register yourself to enter the official auction pool. Once submitted, your profile will be loaded into the live auction database for franchise bidding.
+              </p>
             </div>
-            <h1 className="font-['Outfit'] font-black text-2xl sm:text-3xl lg:text-4xl tracking-tight text-white">
-              {state?.settings?.tournamentName || 'CRICKET LEAGUE AUCTION'}
-            </h1>
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Register yourself to enter the official auction pool. Once submitted, your profile will be loaded into the live auction database for franchise bidding.
-            </p>
           </div>
 
           {/* Quick Share Links & CSV Export */}
