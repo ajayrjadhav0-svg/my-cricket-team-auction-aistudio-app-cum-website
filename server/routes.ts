@@ -31,7 +31,7 @@ apiRouter.post('/teams', (req: Request, res: Response) => {
   if (!result.success) {
     return res.status(400).json({ error: result.message });
   }
-  res.json(result);
+  res.json({ ...result, state: db.getState() });
 });
 
 // PUT update team (Admin)
@@ -40,7 +40,7 @@ apiRouter.put('/teams/:id', (req: Request, res: Response) => {
   if (!result.success) {
     return res.status(400).json({ error: result.message });
   }
-  res.json(result);
+  res.json({ ...result, state: db.getState() });
 });
 
 // DELETE team (Admin)
@@ -49,7 +49,7 @@ apiRouter.delete('/teams/:id', (req: Request, res: Response) => {
   if (!result.success) {
     return res.status(400).json({ error: result.message });
   }
-  res.json(result);
+  res.json({ ...result, state: db.getState() });
 });
 
 // POST update tournament settings (Admin)
@@ -180,7 +180,7 @@ apiRouter.post('/auction/select-player', (req: Request, res: Response) => {
 // CRUD for Players
 apiRouter.post('/players', (req: Request, res: Response) => {
   const result = db.addPlayer(req.body);
-  res.json(result);
+  res.json({ ...result, state: db.getState() });
 });
 
 apiRouter.put('/players/:id', (req: Request, res: Response) => {
@@ -188,7 +188,7 @@ apiRouter.put('/players/:id', (req: Request, res: Response) => {
   if (!result.success) {
     return res.status(400).json({ error: result.message });
   }
-  res.json(result);
+  res.json({ ...result, state: db.getState() });
 });
 
 apiRouter.delete('/players/:id', (req: Request, res: Response) => {

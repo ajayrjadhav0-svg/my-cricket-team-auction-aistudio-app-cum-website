@@ -17,24 +17,23 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
   onSave,
   onDelete,
 }) => {
-  if (!isOpen || !team) return null;
-
-  const [name, setName] = useState(team.name);
-  const [shortCode, setShortCode] = useState(team.shortCode);
-  const [color, setColor] = useState(team.color || '#2563eb');
+  const [name, setName] = useState('');
+  const [shortCode, setShortCode] = useState('');
+  const [color, setColor] = useState('#2563eb');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (team) {
-      setName(team.name);
-      setShortCode(team.shortCode);
+    if (team && isOpen) {
+      setName(team.name || '');
+      setShortCode(team.shortCode || '');
       setColor(team.color || '#2563eb');
+      setIsSubmitting(false);
     }
-  }, [team]);
+  }, [team, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!team || !name.trim()) return;
     setIsSubmitting(true);
     try {
       const ok = await onSave(team.id, {
@@ -49,7 +48,7 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!onDelete) return;
+    if (!onDelete || !team) return;
     if (window.confirm(`Are you sure you want to delete ${team.name}? Any assigned players will return to AVAILABLE pool.`)) {
       setIsSubmitting(true);
       try {
@@ -60,6 +59,8 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
       }
     }
   };
+
+  if (!isOpen || !team) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">

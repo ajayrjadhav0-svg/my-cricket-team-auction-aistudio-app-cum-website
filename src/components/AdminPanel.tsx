@@ -1534,14 +1534,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
       <AddNewPlayerModal
         isOpen={isAddNewPlayerOpen}
         onClose={() => setIsAddNewPlayerOpen(false)}
-        onAddPlayer={async ({ name, role, loadDirectlyToAuction }) => {
-          const res = await state;
-          // We can use fetch or helper
+        onAddPlayer={async ({ name, role, village, photoUrl, loadDirectlyToAuction }) => {
           try {
             const resp = await fetch('/api/players', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name, role }),
+              body: JSON.stringify({ name, role, village, photoUrl }),
             });
             const data = await resp.json();
             if (data.success && data.player) {

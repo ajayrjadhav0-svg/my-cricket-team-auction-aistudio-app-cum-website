@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Users,
   Search,
@@ -13,6 +13,9 @@ import {
   Shield,
   Eye,
   Share2,
+  Camera,
+  Upload,
+  Sparkles,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { Player, PlayerRole, PlayerStatus, ActiveNav } from '../types';
@@ -22,6 +25,7 @@ import {
   getStatusBadgeStyle,
 } from '../utils/formatters';
 import { AuctionExportModal } from './AuctionExportModal';
+import { compressImageFile } from '../utils/imageUtils';
 
 interface PlayersViewProps {
   onNavigateToAuction?: (playerId?: number) => void;
@@ -55,6 +59,10 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
   const [formName, setFormName] = useState('');
   const [formRole, setFormRole] = useState<PlayerRole>('All-Rounder');
   const [formOrder, setFormOrder] = useState<number>(1);
+  const [formVillage, setFormVillage] = useState('');
+  const [formPhotoUrl, setFormPhotoUrl] = useState('');
+  const [isCompressingModalPhoto, setIsCompressingModalPhoto] = useState(false);
+  const modalFileInputRef = useRef<HTMLInputElement>(null);
 
   const players = state?.players || [];
   const teams = state?.teams || [];
@@ -83,7 +91,24 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
     setFormName('');
     setFormRole('All-Rounder');
     setFormOrder(players.length + 1);
+    setFormVillage('');
+    setFormPhotoUrl('');
     setIsAddModalOpen(true);
+  };
+
+  // Modal Photo File Change
+  const handleModalPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsCompressingModalPhoto(true);
+    try {
+      const compressed = await compressImageFile(file, 400, 400, 0.82);
+      setFormPhotoUrl(compressed);
+    } catch {
+      // Fallback
+    } finally {
+      setIsCompressingModalPhoto(false);
+    }
   };
 
   // Submit Add
@@ -94,6 +119,9 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
       name: formName.trim().toUpperCase(),
       role: formRole,
       auctionOrder: Number(formOrder),
+      village: formVillage.trim().toUpperCase(),
+      photoUrl: formPhotoUrl.trim() || undefined,
+      photo: formPhotoUrl.trim() || undefined,
     });
     if (ok) setIsAddModalOpen(false);
   };
@@ -104,6 +132,8 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
     setFormName(player.name);
     setFormRole(player.role);
     setFormOrder(player.auctionOrder);
+    setFormVillage(player.village || '');
+    setFormPhotoUrl(player.photoUrl || player.photo || '');
   };
 
   // Submit Edit
@@ -114,6 +144,9 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
       name: formName.trim().toUpperCase(),
       role: formRole,
       auctionOrder: Number(formOrder),
+      village: formVillage.trim().toUpperCase(),
+      photoUrl: formPhotoUrl.trim() || undefined,
+      photo: formPhotoUrl.trim() || undefined,
     });
     if (ok) setEditingPlayer(null);
   };
@@ -258,9 +291,29 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className="font-['Outfit'] font-bold text-slate-900">
-                          {player.name}
-                        </span>
+                        <div className="flex items-center gap-2.5">
+                          {(player.photoUrl || player.photo) ? (
+                            <img
+                              src={player.photoUrl || player.photo}
+                              alt=""
+                              className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0 font-bold border border-indigo-100">
+                              🏏
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-['Outfit'] font-bold text-slate-900 block leading-tight">
+                              {player.name}
+                            </span>
+                            {player.village && (
+                              <span className="text-[10px] text-slate-400 block">
+                                📍 {player.village}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       <td className="py-3 px-3">
@@ -404,6 +457,79 @@ export const PlayersView: React.FC<PlayersViewProps> = ({
                   onChange={(e) => setFormOrder(Number(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Village / Hometown</label>
+                <input
+                  type="text"
+                  value={formVillage}
+                  onChange={(e) => setFormVillage(e.target.value.toUpperCase())}
+                  placeholder="e.g. PIMPLI, SHIRUR, SATARA"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Player Photo (Optional)</label>
+                <input
+                  ref={modalFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleModalPhotoChange}
+                  className="hidden"
+                  id="modal-player-photo"
+                />
+
+                {formPhotoUrl ? (
+                  <div className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                    <img
+                      src={formPhotoUrl}
+                      alt="Player"
+                      className="w-12 h-12 rounded-lg object-cover border border-slate-300"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[11px] font-bold text-emerald-600 block">
+                        Photo Attached
+                      </span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <label
+                          htmlFor="modal-player-photo"
+                          className="cursor-pointer text-[11px] font-bold text-indigo-600 hover:underline"
+                        >
+                          Change
+                        </label>
+                        <span className="text-slate-300">•</span>
+                        <button
+                          type="button"
+                          onClick={() => setFormPhotoUrl('')}
+                          className="text-[11px] font-bold text-rose-600 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="modal-player-photo"
+                      className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/50 rounded-xl cursor-pointer text-slate-600 transition-colors"
+                    >
+                      <Camera className="w-4 h-4 text-indigo-600" />
+                      <span className="font-semibold text-xs">
+                        {isCompressingModalPhoto ? 'Compressing...' : 'Upload Photo from Device'}
+                      </span>
+                    </label>
+                    <input
+                      type="url"
+                      value={formPhotoUrl}
+                      onChange={(e) => setFormPhotoUrl(e.target.value)}
+                      placeholder="Or paste image URL (https://...)"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">

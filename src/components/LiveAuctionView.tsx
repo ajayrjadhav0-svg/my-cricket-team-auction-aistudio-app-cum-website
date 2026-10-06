@@ -235,15 +235,30 @@ export const LiveAuctionView: React.FC = () => {
                     }}
                     className="w-full text-left py-2 px-2.5 rounded-lg hover:bg-slate-50 flex items-center justify-between text-xs transition-colors"
                   >
-                    <div>
-                      <span className="font-mono text-slate-400 font-bold mr-2">{p.code}</span>
-                      <span className="font-['Outfit'] font-bold text-slate-900">{p.name}</span>
-                      <span className="text-[10px] text-slate-500 block">
-                        {p.role}
-                      </span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {(p.photoUrl || p.photo) ? (
+                        <img
+                          src={p.photoUrl || p.photo}
+                          alt=""
+                          className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0 font-bold border border-indigo-100">
+                          🏏
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="font-mono text-slate-400 font-bold">{p.code}</span>
+                          <span className="font-['Outfit'] font-bold text-slate-900 truncate">{p.name}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 block truncate">
+                          {p.role} {p.village ? `• ${p.village}` : ''}
+                        </span>
+                      </div>
                     </div>
                     <span
-                      className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase ${
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase shrink-0 ${
                         p.status === 'SOLD'
                           ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                           : p.status === 'UNSOLD'
@@ -286,20 +301,35 @@ export const LiveAuctionView: React.FC = () => {
 
             {/* Player Visual & Identity */}
             <div className="p-5 md:p-6 text-center space-y-4">
-              <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-100 border border-slate-200 flex items-center justify-center text-4xl shadow-2xs relative">
-                🏏
-              </div>
+              {(currentPlayer.photoUrl || currentPlayer.photo) ? (
+                <div className="w-28 h-28 sm:w-32 sm:h-32 mx-auto rounded-3xl overflow-hidden border-2 border-indigo-400 shadow-md bg-slate-100 relative group">
+                  <img
+                    src={currentPlayer.photoUrl || currentPlayer.photo}
+                    alt={currentPlayer.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-100 border border-slate-200 flex items-center justify-center text-4xl shadow-2xs relative">
+                  🏏
+                </div>
+              )}
 
               <div>
                 <h2 className="font-['Outfit'] font-black text-2xl md:text-3xl text-slate-900 tracking-tight">
                   {currentPlayer.name}
                 </h2>
-                <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
                   <span
                     className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${roleStyle.bg} ${roleStyle.text} ${roleStyle.border}`}
                   >
                     {currentPlayer.role}
                   </span>
+                  {currentPlayer.village && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+                      📍 {currentPlayer.village}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

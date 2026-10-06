@@ -205,8 +205,30 @@ export const TeamSquadsView: React.FC<TeamSquadsViewProps> = ({
                         #{slotNumber}
                       </td>
                       <td className="py-3 px-4 font-['Outfit'] font-bold text-slate-900">
-                        <span className="font-mono text-indigo-600 mr-2">{player.code}</span>
-                        {player.name}
+                        <div className="flex items-center gap-2.5">
+                          {(player.photoUrl || player.photo) ? (
+                            <img
+                              src={player.photoUrl || player.photo}
+                              alt=""
+                              className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] shrink-0 font-bold border border-indigo-100">
+                              🏏
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-indigo-600 text-xs">{player.code}</span>
+                              <span className="text-slate-900">{player.name}</span>
+                            </div>
+                            {player.village && (
+                              <span className="text-[10px] text-slate-400 font-normal block">
+                                📍 {player.village}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td className="py-3 px-3">
                         <span

@@ -7,8 +7,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // JSON body parser
-  app.use(express.json());
+  // JSON and URL-encoded body parser with generous limits for logos and exports
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // API Routes FIRST
   app.get('/api/health', (req, res) => {

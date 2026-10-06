@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Sparkles,
   Users,
@@ -52,8 +52,6 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
   onOpenAddPlayer,
   onOpenCsvUpload,
 }) => {
-  if (!isOpen) return null;
-
   // Wizard tab
   const [wizardTab, setWizardTab] = useState<'tournament' | 'teams' | 'players'>('tournament');
 
@@ -74,18 +72,6 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (typeof ev.target?.result === 'string') {
-        setTournamentLogo(ev.target.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   // Step 2: Teams Configuration
   const [targetTeamCount, setTargetTeamCount] = useState<number>(teams.length || 6);
   const [teamList, setTeamList] = useState<Array<{ id: string; name: string; shortCode: string; color: string }>>(() => {
@@ -98,6 +84,40 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Synchronize form state whenever modal opens or props change
+  useEffect(() => {
+    if (isOpen) {
+      setTournamentName(currentSettings.tournamentName || 'Premier Cricket League 2026');
+      setTournamentLogo(currentSettings.tournamentLogo || '');
+      setStartingPoints(currentSettings.startingPoints || 100000);
+      setMaxSquadSize(currentSettings.maxSquadSize || 15);
+      setDefaultReservePrice(currentSettings.defaultReservePrice || 500);
+      setTargetTeamCount(teams.length || 6);
+      setTeamList(
+        teams.map((t) => ({
+          id: t.id,
+          name: t.name,
+          shortCode: t.shortCode || (t as any).short || t.name.slice(0, 3).toUpperCase(),
+          color: t.color || '#4f46e5',
+        }))
+      );
+      setWizardTab('tournament');
+      setIsSubmitting(false);
+    }
+  }, [isOpen, currentSettings, teams]);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (typeof ev.target?.result === 'string') {
+        setTournamentLogo(ev.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Sync team list count when targetTeamCount changes (1 to 20 teams)
   const handleTeamCountChange = (count: number) => {
@@ -166,6 +186,8 @@ export const SetNewAuctionModal: React.FC<SetNewAuctionModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">

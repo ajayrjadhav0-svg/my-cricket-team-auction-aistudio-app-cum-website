@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   UserPlus,
   CheckCircle2,
@@ -14,10 +14,16 @@ import {
   Hash,
   User,
   Activity,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { PlayerRole } from '../types';
 import { getRoleBadgeStyle } from '../utils/formatters';
+import { compressImageFile } from '../utils/imageUtils';
 
 interface PlayerRegistrationViewProps {
   onNavigateToAuction?: () => void;
@@ -45,6 +51,14 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
   const [role, setRole] = useState<PlayerRole>('All-Rounder');
   const [village, setVillage] = useState('');
 
+  // Player Photo State
+  const [photoUrl, setPhotoUrl] = useState<string>('');
+  const [photoTab, setPhotoTab] = useState<'upload' | 'url'>('upload');
+  const [photoUrlInput, setPhotoUrlInput] = useState('');
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registeredPlayer, setRegisteredPlayer] = useState<{
     id: number;
@@ -53,6 +67,7 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
     role: PlayerRole;
     srNo: number;
     village: string;
+    photoUrl?: string;
   } | null>(null);
 
   const [copiedLink, setCopiedLink] = useState(false);
@@ -63,6 +78,55 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
       setSrNo(nextRecommendedSrNo);
     }
   }, [nextRecommendedSrNo, registeredPlayer]);
+
+  // Handle Photo File Upload with automatic compression
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhotoUploadError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoUploadError('Please select a valid image file (JPG, PNG, WebP).');
+      return;
+    }
+
+    setIsCompressingPhoto(true);
+    try {
+      // Compress and resize photo to 450x450 JPEG for maximum performance & lightweight payload
+      const compressedDataUrl = await compressImageFile(file, 450, 450, 0.85);
+      setPhotoUrl(compressedDataUrl);
+      showNotification('success', 'Player photo attached and optimized!');
+    } catch (err: any) {
+      setPhotoUploadError('Failed to process photo: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsCompressingPhoto(false);
+    }
+  };
+
+  const handleApplyPhotoUrl = () => {
+    setPhotoUploadError(null);
+    const trimmed = photoUrlInput.trim();
+    if (!trimmed) {
+      setPhotoUploadError('Please enter a valid image URL');
+      return;
+    }
+    if (!/^https?:\/\//i.test(trimmed)) {
+      setPhotoUploadError('Photo URL must begin with http:// or https://');
+      return;
+    }
+    setPhotoUrl(trimmed);
+    setPhotoUrlInput('');
+    showNotification('success', 'Player photo URL applied!');
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUrl('');
+    setPhotoUrlInput('');
+    setPhotoUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Validation logic: English capital letters and surname at last
   const nameValidation = useMemo(() => {
@@ -147,6 +211,8 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
         role,
         village: village.trim().toUpperCase(),
         srNo: Number(srNo) || nextRecommendedSrNo,
+        photoUrl: photoUrl.trim() || undefined,
+        photo: photoUrl.trim() || undefined,
       });
 
       if (ok) {
@@ -158,6 +224,7 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
           role,
           srNo: Number(srNo) || nextRecommendedSrNo,
           village: village.trim().toUpperCase(),
+          photoUrl: photoUrl.trim() || undefined,
         });
         showNotification('success', `Player ${name.trim()} successfully registered!`);
       }
@@ -170,6 +237,12 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
     setRegisteredPlayer(null);
     setName('');
     setVillage('');
+    setPhotoUrl('');
+    setPhotoUrlInput('');
+    setPhotoUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setRole('All-Rounder');
     setSrNo(nextRecommendedSrNo + 1);
   };
@@ -301,7 +374,7 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
           </div>
 
           {/* Registered Player Card */}
-          <div className="max-w-md mx-auto bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left space-y-3">
+          <div className="max-w-md mx-auto bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <span className="font-mono text-xs font-bold text-slate-500">
                 SR NO: #{registeredPlayer.srNo}
@@ -311,16 +384,36 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
               </span>
             </div>
 
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                PLAYER NAME
-              </span>
-              <span className="font-['Outfit'] font-black text-xl text-slate-900 block">
-                {registeredPlayer.name}
-              </span>
+            <div className="flex items-center gap-4">
+              {registeredPlayer.photoUrl ? (
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-indigo-500 shadow-md shrink-0 bg-slate-200">
+                  <img
+                    src={registeredPlayer.photoUrl}
+                    alt={registeredPlayer.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+                  🏏
+                </div>
+              )}
+              <div className="space-y-1 min-w-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  PLAYER NAME
+                </span>
+                <span className="font-['Outfit'] font-black text-xl text-slate-900 block truncate">
+                  {registeredPlayer.name}
+                </span>
+                {registeredPlayer.photoUrl && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <Check className="w-3 h-3" /> Photo Attached
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">ROLE</span>
                 <span className="text-xs font-bold text-slate-800">{registeredPlayer.role}</span>
@@ -520,6 +613,154 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
                 </span>
               </div>
 
+              {/* Field 5: Player Photo (Optional) */}
+              <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <Camera className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>PLAYER PHOTO (OPTIONAL)</span>
+                  </label>
+                  <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                    Shown on Hammer Screen
+                  </span>
+                </div>
+
+                {/* Photo Input Modes */}
+                <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setPhotoTab('upload')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      photoTab === 'upload'
+                        ? 'bg-white text-indigo-600 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload / Camera</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoTab('url')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      photoTab === 'url'
+                        ? 'bg-white text-indigo-600 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" />
+                    <span>Photo Web URL</span>
+                  </button>
+                </div>
+
+                {photoTab === 'upload' ? (
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="player-photo-input"
+                    />
+
+                    {photoUrl ? (
+                      <div className="flex items-center gap-4 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                        <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-indigo-500 shadow-xs bg-slate-200 shrink-0">
+                          <img src={photoUrl} alt="Player" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Photo Attached & Optimized</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            Ready for live bidding display & roster
+                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <label
+                              htmlFor="player-photo-input"
+                              className="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-700 underline"
+                            >
+                              Change Photo
+                            </label>
+                            <span className="text-slate-300">•</span>
+                            <button
+                              type="button"
+                              onClick={handleRemovePhoto}
+                              className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="player-photo-input"
+                        className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+                      >
+                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 group-hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition-colors shadow-2xs">
+                          {isCompressingPhoto ? (
+                            <Sparkles className="w-5 h-5 animate-spin text-indigo-600" />
+                          ) : (
+                            <Camera className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">
+                            {isCompressingPhoto ? 'Optimizing photo...' : 'Click to Upload Photo or Take Selfie'}
+                          </span>
+                          <span className="text-[11px] text-slate-400 block mt-0.5">
+                            JPG, PNG, or WEBP from camera or gallery (auto-compressed for fast loading)
+                          </span>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={photoUrlInput}
+                        onChange={(e) => setPhotoUrlInput(e.target.value)}
+                        placeholder="https://example.com/player-photo.jpg"
+                        className="flex-1 px-4 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyPhotoUrl}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-xs"
+                      >
+                        Apply URL
+                      </button>
+                    </div>
+                    {photoUrl && (
+                      <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-200">
+                        <img src={photoUrl} alt="URL Preview" className="w-9 h-9 rounded-lg object-cover border" />
+                        <span className="text-xs text-slate-600 font-medium truncate flex-1">{photoUrl}</span>
+                        <button
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {photoUploadError && (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{photoUploadError}</span>
+                  </div>
+                )}
+              </div>
+
               {/* Submit Button */}
               <div className="pt-3">
                 <button
@@ -563,10 +804,20 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
                   </span>
                 </div>
 
-                <div className="my-4 text-center space-y-1.5">
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center mx-auto text-2xl shadow-inner">
-                    🏏
-                  </div>
+                <div className="my-4 text-center space-y-2">
+                  {photoUrl ? (
+                    <div className="w-20 h-20 mx-auto rounded-2xl overflow-hidden border-2 border-indigo-400/80 shadow-lg bg-slate-800">
+                      <img
+                        src={photoUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center mx-auto text-2xl shadow-inner">
+                      🏏
+                    </div>
+                  )}
                   <h3 className="font-['Outfit'] font-black text-xl text-white tracking-wide uppercase break-words">
                     {name.trim() || 'PLAYER NAME'}
                   </h3>
@@ -609,6 +860,9 @@ export const PlayerRegistrationView: React.FC<PlayerRegistrationViewProps> = ({
                 </li>
                 <li>
                   <strong className="text-slate-800">Village:</strong> Enter your native village or town so teams can identify local talent.
+                </li>
+                <li>
+                  <strong className="text-slate-800">Player Photo:</strong> Optional photo or selfie for the big screen auction hammer stage.
                 </li>
               </ul>
             </div>

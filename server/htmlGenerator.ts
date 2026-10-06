@@ -611,7 +611,12 @@ export function generateStandaloneAuctionHTML(state: FullAuctionState): string {
                 )}">
                 <td>${p.srNo || idx + 1}</td>
                 <td><code>${escapeHtml(p.code)}</code></td>
-                <td><strong>${escapeHtml(p.name)}</strong></td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    ${(p.photoUrl || p.photo) ? `<img src="${escapeHtml(p.photoUrl || p.photo || '')}" style="width: 26px; height: 26px; border-radius: 6px; object-fit: cover;" />` : ''}
+                    <strong>${escapeHtml(p.name)}</strong>
+                  </div>
+                </td>
                 <td><span class="role-badge">${escapeHtml(p.role)}</span></td>
                 <td><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></td>
                 <td><strong>${escapeHtml(team)}</strong></td>

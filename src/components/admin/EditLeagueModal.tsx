@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Trophy,
@@ -75,7 +75,16 @@ export const EditLeagueModal: React.FC<EditLeagueModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
+  // Synchronize with latest settings when modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setLeagueName(currentName || '');
+      setLeagueLogo(currentLogo || '');
+      setUrlInput('');
+      setUploadError(null);
+      setIsSaving(false);
+    }
+  }, [isOpen, currentName, currentLogo]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
@@ -132,6 +141,8 @@ export const EditLeagueModal: React.FC<EditLeagueModalProps> = ({
       setIsSaving(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">

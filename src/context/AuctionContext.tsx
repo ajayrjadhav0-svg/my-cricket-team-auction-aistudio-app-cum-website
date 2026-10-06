@@ -425,11 +425,17 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      await fetch('/api/players', {
+      const res = await fetch('/api/players', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(playerData),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.state) {
+          updateStateAndPersist(data.state);
+        }
+      }
     } catch {}
 
     return true;
@@ -443,11 +449,17 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      await fetch(`/api/players/${id}`, {
+      const res = await fetch(`/api/players/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(playerData),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.state) {
+          updateStateAndPersist(data.state);
+        }
+      }
     } catch {}
 
     return true;
@@ -473,12 +485,20 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showNotification('success', 'Tournament settings updated successfully!');
 
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settingsUpdates),
       });
-    } catch {}
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.state) {
+          updateStateAndPersist(data.state);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not sync settings to server', err);
+    }
 
     return true;
   };
@@ -540,12 +560,20 @@ export const AuctionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showNotification('success', 'Team updated successfully!');
 
     try {
-      await fetch(`/api/teams/${id}`, {
+      const res = await fetch(`/api/teams/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(teamData),
       });
-    } catch {}
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.state) {
+          updateStateAndPersist(data.state);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not sync team update to server', err);
+    }
 
     return true;
   };

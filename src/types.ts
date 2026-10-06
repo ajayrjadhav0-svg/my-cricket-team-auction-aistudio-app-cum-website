@@ -15,6 +15,8 @@ export interface Player {
   soldAt?: string;
   srNo?: number;
   village?: string;
+  photoUrl?: string;
+  photo?: string;
 }
 
 export interface Team {

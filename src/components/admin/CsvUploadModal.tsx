@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Check, FileText, Download } from 'lucide-react';
 
 interface CsvUploadModalProps {
@@ -12,12 +12,23 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
   onClose,
   onImportCSV,
 }) => {
-  if (!isOpen) return null;
-
   const [csvContent, setCsvContent] = useState('');
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCsvContent('');
+      setReplaceExisting(false);
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

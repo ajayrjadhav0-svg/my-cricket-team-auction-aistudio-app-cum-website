@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActiveNav } from './types';
 import { AuctionProvider, useAuction } from './context/AuctionContext';
 import { Sidebar } from './components/Sidebar';
@@ -54,6 +54,12 @@ function AuctionAppContent() {
   const handleNavigateToAuction = () => {
     setActiveNav('live-auction');
   };
+
+  useEffect(() => {
+    if (state?.settings?.tournamentName) {
+      document.title = `${state.settings.tournamentName} - Live Cricket Auction`;
+    }
+  }, [state?.settings?.tournamentName]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-['Inter'] selection:bg-indigo-500/20 selection:text-indigo-900">

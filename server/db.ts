@@ -681,6 +681,8 @@ class AuctionDatabase {
       ? newPlayerData.srNo
       : (Math.max(...this.state.players.map(p => p.srNo || p.id), 0) + 1);
 
+    const photo = (newPlayerData.photoUrl || newPlayerData.photo || '').trim();
+
     const player: Player = {
       id: nextId,
       code: `P${nextId.toString().padStart(3, '0')}`,
@@ -693,6 +695,8 @@ class AuctionDatabase {
       isIcon: false,
       srNo: nextSrNo,
       village: (newPlayerData.village || '').trim(),
+      photoUrl: photo || undefined,
+      photo: photo || undefined,
     };
 
     this.state.players.push(player);
@@ -711,6 +715,11 @@ class AuctionDatabase {
     if (typeof updates.srNo === 'number') player.srNo = updates.srNo;
     if (updates.village !== undefined) player.village = updates.village.trim();
     if (updates.status) player.status = updates.status;
+    if (updates.photoUrl !== undefined || updates.photo !== undefined) {
+      const p = (updates.photoUrl ?? updates.photo ?? '').trim();
+      player.photoUrl = p || undefined;
+      player.photo = p || undefined;
+    }
 
     this.recalculateAllTeams();
     this.saveToDisk();

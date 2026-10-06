@@ -328,6 +328,7 @@ export function clientAddPlayer(
   const maxId = state.players.reduce((max, p) => Math.max(max, p.id || 0), 0);
   const newId = maxId + 1;
   const newSrNo = playerData.srNo || newId;
+  const photo = (playerData.photoUrl || playerData.photo || '').trim();
 
   const newPlayer: Player = {
     id: newId,
@@ -341,6 +342,8 @@ export function clientAddPlayer(
     isIcon: false,
     srNo: newSrNo,
     village: playerData.village || '',
+    photoUrl: photo || undefined,
+    photo: photo || undefined,
   };
 
   const updatedPlayers = [...state.players, newPlayer];
@@ -365,10 +368,19 @@ export function clientUpdatePlayer(
 ): { success: boolean; state: FullAuctionState; message: string } {
   const updatedPlayers = state.players.map((p) => {
     if (p.id === id) {
+      const photoVal =
+        playerData.photoUrl !== undefined
+          ? playerData.photoUrl
+          : playerData.photo !== undefined
+          ? playerData.photo
+          : p.photoUrl;
+
       return {
         ...p,
         ...playerData,
         name: (playerData.name !== undefined ? playerData.name : p.name).toUpperCase().trim(),
+        photoUrl: photoVal ? photoVal.trim() : undefined,
+        photo: photoVal ? photoVal.trim() : undefined,
       };
     }
     return p;
