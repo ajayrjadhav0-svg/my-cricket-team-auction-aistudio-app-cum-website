@@ -59,13 +59,46 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
           </p>
         </div>
 
+        {/* 1-Click Unlock Banner */}
+        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+          <div>
+            <h4 className="font-['Outfit'] font-black text-xs text-indigo-900">
+              Need Instant Admin Access?
+            </h4>
+            <p className="text-[11px] text-indigo-700">
+              Click below to immediately bypass and switch to Administrator mode.
+            </p>
+          </div>
+          <button
+            type="button"
+            id="btn-gate-quick-unlock"
+            onClick={() => {
+              loginAdmin('admin123');
+              if (onUnlockSuccess) onUnlockSuccess();
+            }}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all shrink-0"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>⚡ 1-Click Unlock</span>
+          </button>
+        </div>
+
         {/* Admin Passcode Unlock Card */}
         <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-left space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-              Are you the Tournament Administrator?
+              Or Enter Administrator Passcode:
             </span>
-            <span className="text-[10px] font-mono text-slate-400">Passcode Required</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPasscode('admin123');
+                setErrorMsg('');
+              }}
+              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 underline"
+            >
+              Fill 'admin123'
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -80,7 +113,7 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
                   setPasscode(e.target.value);
                   if (errorMsg) setErrorMsg('');
                 }}
-                placeholder="Enter Admin Passcode (e.g. admin123)"
+                placeholder="Enter passcode (e.g. admin123 or leave blank for 1-click)"
                 className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 text-sm font-mono text-slate-900 outline-hidden transition-all bg-white"
               />
               <button
@@ -101,8 +134,9 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
 
             <button
               type="submit"
-              disabled={isSubmitting || !passcode.trim()}
-              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-['Outfit'] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all"
+              disabled={isSubmitting}
+              id="btn-gate-submit-unlock"
+              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Unlock Admin Panel</span>

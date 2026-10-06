@@ -63,6 +63,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
     createNewAuction,
     clearAllPlayers,
     importCSV,
+    addPlayer,
     getViewerShareUrl,
     showNotification,
   } = useAuction();
@@ -1536,16 +1537,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectNav }) => {
         onClose={() => setIsAddNewPlayerOpen(false)}
         onAddPlayer={async ({ name, role, village, photoUrl, loadDirectlyToAuction }) => {
           try {
-            const resp = await fetch('/api/players', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name, role, village, photoUrl }),
+            const ok = await addPlayer({
+              name,
+              role,
+              village,
+              photoUrl,
+              photo: photoUrl,
             });
-            const data = await resp.json();
-            if (data.success && data.player) {
-              if (loadDirectlyToAuction) {
-                await selectAuctionPlayer(data.player.id);
-                setPlayerInput(String(data.player.id));
+            if (ok) {
+              // Retrieve the newly added player to load to hammer if requested
+              const latestPlayers = state?.players || [];
+              const newlyAdded = latestPlayers[latestPlayers.length - 1];
+              if (loadDirectlyToAuction && newlyAdded) {
+                await selectAuctionPlayer(newlyAdded.id);
+                setPlayerInput(String(newlyAdded.id));
               }
               showNotification('success', `Added ${name} to player pool!`);
               return true;

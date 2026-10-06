@@ -15,6 +15,7 @@ export interface Player {
   soldAt?: string;
   srNo?: number;
   village?: string;
+  basePrice?: number;
   photoUrl?: string;
   photo?: string;
 }

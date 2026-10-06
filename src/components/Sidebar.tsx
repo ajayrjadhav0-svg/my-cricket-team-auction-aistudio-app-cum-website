@@ -29,15 +29,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { state, role, logoutAdmin } = useAuction();
 
-  // Public navigation items.
+  // Navigation items
   const navItems: { id: ActiveNav; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'dashboard', label: 'DASHBOARD', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'live-auction', label: 'LIVE AUCTION', icon: <Gavel className="w-5 h-5" />, badge: 'LIVE' },
-    { id: 'register', label: 'PLAYER REGISTRATION', icon: <UserPlus className="w-5 h-5" />, badge: 'FORM' },
     { id: 'players', label: 'PLAYERS', icon: <Users className="w-5 h-5" /> },
     { id: 'teams', label: 'TEAMS', icon: <Shield className="w-5 h-5" /> },
     { id: 'team-squads', label: 'TEAM SQUADS', icon: <Trophy className="w-5 h-5" /> },
     { id: 'auction-history', label: 'AUCTION HISTORY', icon: <History className="w-5 h-5" /> },
+    { id: 'register', label: 'PLAYER REGISTRATION', icon: <UserPlus className="w-5 h-5" />, badge: 'FORM' },
     { id: 'settings', label: 'SETTINGS', icon: <Settings className="w-5 h-5" /> },
   ];
 

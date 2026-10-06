@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserPlus, X, Check, Gavel, Camera, Trash2 } from 'lucide-react';
+import { UserPlus, X, Check, Gavel, Camera, Trash2, Crop } from 'lucide-react';
 import { PlayerRole } from '../../types';
 import { compressImageFile } from '../../utils/imageUtils';
+import { ImageCropModal } from '../ImageCropModal';
+import { PRESET_PLAYER_AVATARS } from '../../data/presetAvatars';
 
 interface AddNewPlayerModalProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ export const AddNewPlayerModal: React.FC<AddNewPlayerModalProps> = ({
   const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
   const [loadDirectlyToAuction, setLoadDirectlyToAuction] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -167,26 +170,58 @@ export const AddNewPlayerModal: React.FC<AddNewPlayerModalProps> = ({
               id="admin-new-player-photo"
             />
             {photoUrl ? (
-              <div className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                <img src={photoUrl} alt="Photo" className="w-10 h-10 rounded-lg object-cover border" />
-                <span className="text-xs font-bold text-emerald-600 flex-1">Photo Attached</span>
-                <button
-                  type="button"
-                  onClick={() => setPhotoUrl('')}
-                  className="text-xs text-rose-600 hover:underline flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove</span>
-                </button>
+              <div className="flex items-center gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <img src={photoUrl} alt="Photo" className="w-12 h-12 rounded-xl object-cover border-2 border-indigo-500 shadow-2xs" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold text-slate-800 block">Photo Attached</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsCropModalOpen(true)}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-[11px] flex items-center gap-1 shadow-2xs"
+                    >
+                      <Crop className="w-3 h-3" />
+                      <span>Crop / Frame</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoUrl('')}
+                      className="text-[11px] text-rose-600 hover:underline flex items-center gap-1 font-bold"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
-              <label
-                htmlFor="admin-new-player-photo"
-                className="flex items-center justify-center gap-2 p-2.5 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/50 rounded-xl cursor-pointer text-slate-600 transition-colors text-xs"
-              >
-                <Camera className="w-4 h-4 text-indigo-600" />
-                <span>{isCompressingPhoto ? 'Processing photo...' : 'Click to Upload Player Photo'}</span>
-              </label>
+              <div className="space-y-2">
+                <label
+                  htmlFor="admin-new-player-photo"
+                  className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/50 rounded-xl cursor-pointer text-slate-600 transition-colors text-xs"
+                >
+                  <Camera className="w-4 h-4 text-indigo-600" />
+                  <span>{isCompressingPhoto ? 'Processing photo...' : 'Click to Upload Player Photo'}</span>
+                </label>
+
+                {/* Preset Avatars Row */}
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                  <span className="text-[10px] font-bold text-slate-400 shrink-0 uppercase">
+                    Or Avatar:
+                  </span>
+                  {PRESET_PLAYER_AVATARS.map((av) => (
+                    <button
+                      key={av.id}
+                      type="button"
+                      onClick={() => setPhotoUrl(av.dataUri)}
+                      className="w-7 h-7 rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-500 shrink-0 shadow-2xs hover:scale-110 transition-transform"
+                      title={av.label}
+                    >
+                      <img src={av.dataUri} alt={av.label} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
@@ -228,6 +263,17 @@ export const AddNewPlayerModal: React.FC<AddNewPlayerModalProps> = ({
           </div>
         </form>
       </div>
+
+      <ImageCropModal
+        isOpen={isCropModalOpen}
+        imageSrc={photoUrl}
+        onClose={() => setIsCropModalOpen(false)}
+        onCropComplete={(croppedDataUrl) => {
+          setPhotoUrl(croppedDataUrl);
+          setIsCropModalOpen(false);
+        }}
+        title="Crop & Frame Player Photo"
+      />
     </div>
   );
 };

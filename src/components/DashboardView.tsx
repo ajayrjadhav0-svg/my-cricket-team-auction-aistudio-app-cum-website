@@ -14,10 +14,15 @@ import {
   ExternalLink,
   ChevronRight,
   Sparkles,
+  Crop,
+  Edit2,
+  Camera,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { formatINR, formatPoints, formatTransactionTime, getRoleBadgeStyle, getTeamStatusBadge } from '../utils/formatters';
 import { ActiveNav, Player, Team } from '../types';
+import { ImageCropModal } from './ImageCropModal';
+import { EditPlayerModal } from './admin/EditPlayerModal';
 
 interface DashboardViewProps {
   onNavigate: (nav: ActiveNav) => void;
@@ -28,11 +33,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
   onSelectTeamForSquad,
 }) => {
-  const { state, role } = useAuction();
+  const { state, role, updatePlayer, showNotification } = useAuction();
 
   // State for Player Status Tabs
   const [activeTab, setActiveTab] = useState<'sold' | 'unsold' | 'pool'>('sold');
   const [playerSearchQuery, setPlayerSearchQuery] = useState('');
+
+  // Admin Crop and Edit Player Modal States
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [cropTargetImage, setCropTargetImage] = useState<string>('');
+  const [cropTargetPlayerId, setCropTargetPlayerId] = useState<number | null>(null);
+  const [isEditPlayerModalOpen, setIsEditPlayerModalOpen] = useState(false);
+  const [editingTargetPlayer, setEditingTargetPlayer] = useState<Player | null>(null);
 
   // Memoized player classifications
   const { soldPlayers, unsoldPlayers, poolPlayers } = useMemo(() => {
@@ -157,34 +169,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Active Player Card Body */}
-          <div className="p-5 flex-1 flex flex-col justify-between">
-            <div className="flex items-center gap-4">
-              {/* Player Avatar / Photo */}
-              <div className="relative shrink-0">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-100 border-2 border-indigo-200 flex items-center justify-center text-indigo-700 shadow-inner overflow-hidden">
+          <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-5">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+              {/* Player Avatar / Photo - Projector High Visibility */}
+              <div className="relative shrink-0 group">
+                <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-3xl bg-slate-950 border-4 border-indigo-500 ring-4 ring-indigo-500/20 shadow-xl flex items-center justify-center text-indigo-700 overflow-hidden">
                   {currentPlayer?.photoUrl ? (
                     <img
                       src={currentPlayer.photoUrl}
                       alt={currentPlayer.name}
                       referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <User className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-400" />
+                    <User className="w-16 h-16 sm:w-20 sm:h-20 text-indigo-400" />
                   )}
                 </div>
-                <div className="absolute -bottom-1.5 -right-1.5">
-                  <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
-                    <Gavel className="w-3 h-3" />
+                <div className="absolute -bottom-1 -right-1">
+                  <span className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                    <Gavel className="w-3.5 h-3.5" />
                   </span>
                 </div>
               </div>
 
               {/* Player Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <div className="flex-1 min-w-0 text-center sm:text-left space-y-2">
+                <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                   <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border font-['Outfit'] ${
+                    className={`inline-block px-3 py-1 rounded-xl text-xs font-black border font-['Outfit'] uppercase tracking-wider ${
                       currentPlayer ? getRoleBadgeStyle(currentPlayer.role).bg : 'bg-slate-100'
                     } ${
                       currentPlayer ? getRoleBadgeStyle(currentPlayer.role).text : 'text-slate-700'
@@ -194,19 +206,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   >
                     {currentPlayer?.role || 'All-Rounder'}
                   </span>
-                  <span className="text-[11px] font-mono text-slate-500 font-semibold">
+                  <span className="text-xs font-mono text-slate-500 font-bold">
                     Reserve: {formatPoints(currentPlayer?.basePrice || 500)} pts
                   </span>
+                  {currentPlayer?.village && (
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-300 uppercase">
+                      📍 {currentPlayer.village}
+                    </span>
+                  )}
                 </div>
 
-                <h2 className="font-['Outfit'] font-black text-xl sm:text-2xl text-slate-900 tracking-tight truncate">
+                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl md:text-4xl text-slate-950 tracking-tight uppercase leading-tight drop-shadow-xs break-words">
                   {currentPlayer?.name || 'Ready for Next Player'}
                 </h2>
 
-                <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 truncate">
+                <p className="text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1.5 truncate">
                   <span>Status:</span>
                   <span
-                    className={`font-bold uppercase ${
+                    className={`font-black uppercase ${
                       currentPlayer?.status === 'SOLD'
                         ? 'text-emerald-600'
                         : currentPlayer?.status === 'UNSOLD'
@@ -217,12 +234,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     {currentPlayer?.status || 'AVAILABLE'}
                   </span>
                   {currentPlayer?.status === 'SOLD' && currentPlayer.soldToTeamId && (
-                    <span className="text-slate-700 font-medium truncate">
+                    <span className="text-slate-700 font-semibold truncate">
                       (Sold to{' '}
                       {teams.find((t) => t.id === currentPlayer.soldToTeamId)?.name || 'Team'})
                     </span>
                   )}
                 </p>
+
+                {/* Admin Quick Action Toolbar for Active Player */}
+                {role === 'admin' && currentPlayer && (
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCropTargetImage(currentPlayer.photoUrl || '');
+                        setCropTargetPlayerId(currentPlayer.id);
+                        setIsCropModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-['Outfit'] font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                      title="Crop and frame this player's photo"
+                    >
+                      <Crop className="w-3.5 h-3.5" />
+                      <span>Crop Photo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTargetPlayer(currentPlayer);
+                        setIsEditPlayerModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-['Outfit'] font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                      title="Edit player form"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Edit Player Form</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
